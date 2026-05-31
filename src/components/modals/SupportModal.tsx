@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
+import { trackEvent } from "../../lib/analytics";
 
 interface SupportModalProps {
   isOpen: boolean;
@@ -55,6 +56,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ isOpen, onClose, isD
               href="https://buymeacoffee.com" 
               target="_blank" 
               rel="noopener noreferrer"
+              onClick={() => trackEvent("click_support_platform", { support_platform: "buy_me_a_coffee" })}
               className={`block w-full text-center text-sm font-bold uppercase tracking-widest px-6 py-4 border transition-colors ${
                 isDarkMode 
                   ? "bg-white text-black hover:bg-zinc-200 border-white" 

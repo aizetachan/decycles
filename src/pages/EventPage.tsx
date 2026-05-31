@@ -4,6 +4,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { X, Calendar as CalendarIcon, MapPin, ArrowRight, Share2, Check, Loader2 } from "lucide-react";
 import { db } from "../firebase";
 import { useUI } from "../contexts/UIContext";
+import { trackEvent } from "../lib/analytics";
 import { useAuth } from "../contexts/AuthContext";
 import { useRsvps, type RsvpStatus } from "../hooks/useRsvps";
 import { Header } from "../components/layout/Header";
@@ -55,6 +56,13 @@ export function EventPage() {
 
   const handleShare = async () => {
     const url = window.location.href;
+    if (event) {
+      trackEvent("share", {
+        content_type: "event",
+        item_id: `${creatorId}_${eventIdx}`,
+        item_name: event.title || "Untitled Event",
+      });
+    }
     // Touch devices (mobile/tablet) get the native share sheet. Desktop
     // (including macOS Safari which also exposes navigator.share) copies.
     const isTouch = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)")?.matches;
@@ -110,6 +118,17 @@ export function EventPage() {
   useEffect(() => () => {
     document.title = "Decycles";
   }, []);
+
+  // Track event view in Google Analytics
+  useEffect(() => {
+    if (event && creatorId) {
+      trackEvent("view_event", {
+        event_title: event.title || "Untitled Event",
+        creator_id: creatorId,
+        event_category: event.category || "None",
+      });
+    }
+  }, [event, creatorId]);
 
   const dateLabel = formatRange(event?.startDate, event?.endDate);
   const timeLabel = event?.startTime ? (event?.endTime ? `${event.startTime} – ${event.endTime}` : event.startTime) : null;
@@ -246,7 +265,13 @@ export function EventPage() {
                             openJoinModal("signin");
                             return;
                           }
-                          rsvps.setStatus(active ? null : key);
+                          const nextStatus = active ? null : key;
+                          rsvps.setStatus(nextStatus);
+                          trackEvent("join_event", {
+                            event_title: event.title || "Untitled Event",
+                            creator_id: creatorId,
+                            rsvp_status: nextStatus || "none",
+                          });
                         }}
                         className={`inline-flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest border-2 transition-colors ${
                           active

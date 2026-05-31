@@ -18,6 +18,7 @@ import { SubcategoryFilter } from "../components/home/SubcategoryFilter";
 import { FiltersBottomSheet } from "../components/home/FiltersBottomSheet";
 import { useCategories } from "../contexts/CategoriesContext";
 import { CreatorGrid } from "../components/home/CreatorGrid";
+import { trackEvent } from "../lib/analytics";
 import { CreatorMap } from "../components/home/CreatorMap";
 import { EventCalendar } from "../components/home/EventCalendar";
 import { Category, SubCategory, Creator } from "../types";
@@ -452,6 +453,61 @@ export function Home() {
       .sort(() => Math.random() - 0.5)
       .slice(0, 24);
   }, [creators]);
+
+  // Track tab changes (EXPLORE, GALLERY, CALENDAR)
+  useEffect(() => {
+    trackEvent("change_tab", {
+      tab_name: featuredTab.toLowerCase(),
+    });
+  }, [featuredTab]);
+
+  // Track view mode changes (grid vs map)
+  useEffect(() => {
+    trackEvent("change_view_mode", {
+      view_mode: viewMode,
+    });
+  }, [viewMode]);
+
+  // Track category filter changes
+  useEffect(() => {
+    if (activeCategory !== "All") {
+      trackEvent("filter_creators", {
+        filter_type: "category",
+        filter_value: activeCategory,
+      });
+    }
+  }, [activeCategory]);
+
+  // Track country filter changes
+  useEffect(() => {
+    if (selectedCountry !== "All") {
+      trackEvent("filter_creators", {
+        filter_type: "country",
+        filter_value: selectedCountry,
+      });
+    }
+  }, [selectedCountry]);
+
+  // Debounced search query tracking
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q || q.length < 3) return;
+
+    const timer = setTimeout(() => {
+      trackEvent("search_creators", {
+        search_term: q,
+      });
+
+      // Track if search had 0 results
+      if (filteredCreators.length === 0) {
+        trackEvent("search_no_results", {
+          search_term: q,
+        });
+      }
+    }, 1500); // 1.5s debounce
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, filteredCreators.length]);
 
   const calendarEvents = useMemo(() => {
     const passesFilters = (country: string | undefined, category: string | undefined) => {

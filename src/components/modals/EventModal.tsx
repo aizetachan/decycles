@@ -6,6 +6,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useT } from "../../contexts/LanguageContext";
 import { useRsvps, type RsvpStatus } from "../../hooks/useRsvps";
 import { EVENT_CATEGORY_COLORS } from "../../constants/categories";
+import { trackEvent } from "../../lib/analytics";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -39,6 +40,11 @@ export function EventModal() {
   const handleShare = async () => {
     if (!selectedEvent?.creatorId || typeof selectedEvent?._eventIdx !== "number") return;
     const url = `${window.location.origin}/event/${selectedEvent.creatorId}/${selectedEvent._eventIdx}`;
+    trackEvent("share", {
+      content_type: "event",
+      item_id: `${selectedEvent.creatorId}_${selectedEvent._eventIdx}`,
+      item_name: selectedEvent.name || "Untitled Event",
+    });
     // Desktop Safari also exposes navigator.share, so feature-detection alone
     // would open the macOS Share sheet on Mac — we want clipboard there.
     // `pointer: coarse` is the most reliable touch-device hint.
@@ -220,7 +226,13 @@ export function EventModal() {
                               openJoinModal("signin");
                               return;
                             }
-                            rsvps.setStatus(active ? null : key);
+                            const nextStatus = active ? null : key;
+                            rsvps.setStatus(nextStatus);
+                            trackEvent("join_event", {
+                              event_title: e?.name || "Untitled Event",
+                              creator_id: e?.creatorId || "",
+                              rsvp_status: nextStatus || "none",
+                            });
                           }}
                           className={`inline-flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest border-2 transition-colors ${
                             active

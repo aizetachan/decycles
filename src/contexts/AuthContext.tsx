@@ -15,6 +15,7 @@ import {
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { auth, db, googleProvider } from "../firebase";
 import { stripUndefined } from "../lib/upload";
+import { setUserProperties } from "../lib/analytics";
 import { randomUserAvatar } from "../lib/defaultAvatars";
 
 interface AuthContextType {
@@ -57,6 +58,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!user) {
         setUserProfile(null);
         setLoading(false);
+        setUserProperties({
+          user_role: "anonymous",
+          has_shop: "false",
+        });
       }
     });
     // Hard safety net so the app never gets stuck on a spinner.
@@ -89,6 +94,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = docSnap.data();
         setUserProfile(data);
         setLoading(false);
+
+        if (data) {
+          setUserProperties({
+            user_role: (data.role || "user") as any,
+            has_shop: data.role === "creator" ? "true" : "false",
+          });
+        }
 
         // Keep the cached ID token's `admin` claim aligned with the Firestore
         // role. The syncAdminClaim Cloud Function mirrors role → claim, but

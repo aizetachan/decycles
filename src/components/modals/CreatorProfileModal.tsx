@@ -9,6 +9,7 @@ import { useT } from "../../contexts/LanguageContext";
 import { GalleryImageModal } from "./GalleryImageModal";
 import { Creator } from "../../types";
 import { db } from "../../firebase";
+import { trackEvent } from "../../lib/analytics";
 
 /**
  * Creator profile shown as a modal overlay (replaces the old `/creator/:id` page).
@@ -42,6 +43,13 @@ export function CreatorProfileModal() {
   const handleShare = async () => {
     if (!selectedCreatorId) return;
     const url = `${window.location.origin}/creator/${selectedCreatorId}`;
+    if (selectedCreator) {
+      trackEvent("share", {
+        content_type: "creator",
+        item_id: selectedCreatorId,
+        item_name: selectedCreator.name,
+      });
+    }
     const isTouch = typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)")?.matches;
     if (isTouch && typeof navigator !== "undefined" && (navigator as any).share) {
       try {
@@ -68,6 +76,12 @@ export function CreatorProfileModal() {
     setFavouriteSaving(true);
     try {
       await updateUserProfile({ favorites: next });
+      if (selectedCreator) {
+        trackEvent(isFavourited ? "remove_favorite" : "add_favorite", {
+          creator_name: selectedCreator.name,
+          creator_category: selectedCreator.categories?.join(", ") || "",
+        });
+      }
     } catch (err) {
       console.error("Failed to update favorites", err);
     } finally {
@@ -82,6 +96,27 @@ export function CreatorProfileModal() {
   // Which gallery image is the hero. Resets to 0 when the creator changes.
   const [heroIdx, setHeroIdx] = useState(0);
   useEffect(() => { setHeroIdx(0); }, [selectedCreatorId]);
+
+  const trackSocialClick = (platform: string, url: string) => {
+    if (selectedCreator) {
+      trackEvent("click_creator_social", {
+        creator_name: selectedCreator.name,
+        social_platform: platform,
+        link_url: url,
+      });
+    }
+  };
+
+  // Track profile view in Google Analytics
+  useEffect(() => {
+    if (selectedCreator && selectedCreatorId) {
+      trackEvent("view_creator_profile", {
+        creator_id: selectedCreator.id === "current-user" ? currentUser?.uid : selectedCreator.id,
+        creator_name: selectedCreator.name,
+        creator_category: selectedCreator.categories?.join(", ") || "",
+      });
+    }
+  }, [selectedCreator?.id, selectedCreatorId, currentUser?.uid]);
 
   // Fetch (or compose) the creator whenever selectedCreatorId changes.
   useEffect(() => {
@@ -334,6 +369,7 @@ export function CreatorProfileModal() {
                               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${selectedCreator.address}, ${selectedCreator.location || ""}, ${selectedCreator.country || ""}`)}`}
                               target="_blank"
                               rel="noopener noreferrer"
+                              onClick={() => trackSocialClick("google_maps", `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${selectedCreator.address}, ${selectedCreator.location || ""}, ${selectedCreator.country || ""}`)}`)}
                               className={`flex items-center gap-1 hover:underline transition-colors ${isDarkMode ? "text-white hover:text-gray-300" : "text-black hover:text-gray-600"}`}
                             >
                               <MapPin className="w-3.5 h-3.5" />
@@ -361,6 +397,7 @@ export function CreatorProfileModal() {
                               href={selectedCreator.website}
                               target="_blank"
                               rel="noopener noreferrer"
+                              onClick={() => trackSocialClick("website", selectedCreator.website || "")}
                               className={`flex items-center gap-2 transition-colors text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-black"}`}
                               title={t("creator.visitWebsite")}
                             >
@@ -373,6 +410,7 @@ export function CreatorProfileModal() {
                               href={selectedCreator.socials.instagram}
                               target="_blank"
                               rel="noopener noreferrer"
+                              onClick={() => trackSocialClick("instagram", selectedCreator.socials?.instagram || "")}
                               className={`flex items-center gap-2 transition-colors text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-black"}`}
                               title="Instagram"
                             >
@@ -387,6 +425,7 @@ export function CreatorProfileModal() {
                               href={selectedCreator.socials.facebook}
                               target="_blank"
                               rel="noopener noreferrer"
+                              onClick={() => trackSocialClick("facebook", selectedCreator.socials?.facebook || "")}
                               className={`flex items-center gap-2 transition-colors text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-black"}`}
                               title="Facebook"
                             >
@@ -401,6 +440,7 @@ export function CreatorProfileModal() {
                               href={selectedCreator.socials.twitter}
                               target="_blank"
                               rel="noopener noreferrer"
+                              onClick={() => trackSocialClick("twitter", selectedCreator.socials?.twitter || "")}
                               className={`flex items-center gap-2 transition-colors text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-black"}`}
                               title="Twitter"
                             >
@@ -428,7 +468,15 @@ export function CreatorProfileModal() {
                               {/* Hero image — clicking opens the full-size preview/lightbox */}
                               <div
                                 className="cursor-pointer group relative overflow-hidden brutalist-border"
-                                onClick={() => heroUrl && setSelectedGalleryImage({ creator: selectedCreator!, img: heroUrl })}
+                                onClick={() => {
+                                  if (heroUrl) {
+                                    setSelectedGalleryImage({ creator: selectedCreator!, img: heroUrl });
+                                    trackEvent("view_gallery_image", {
+                                      creator_name: selectedCreator?.name || "",
+                                      image_url: heroUrl,
+                                    });
+                                  }
+                                }}
                               >
                                 <img
                                   src={heroUrl}
@@ -506,6 +554,10 @@ export function CreatorProfileModal() {
           if (url) {
             setSelectedGalleryImage({ creator: selectedCreator, img: url });
             setHeroIdx(i);
+            trackEvent("view_gallery_image", {
+              creator_name: selectedCreator?.name || "",
+              image_url: url,
+            });
           }
         }}
       />

@@ -5,6 +5,7 @@ import { GestureHandling } from "leaflet-gesture-handling";
 import "leaflet-gesture-handling/dist/leaflet-gesture-handling.css";
 import { Creator } from "../../types";
 import { useUI } from "../../contexts/UIContext";
+import { trackEvent } from "../../lib/analytics";
 import { EVENT_CATEGORY_COLORS } from "../../constants/categories";
 
 // Register two-finger / Ctrl+wheel gesture handling once at module load.
@@ -114,7 +115,12 @@ export function CreatorMap({ isDarkMode, filteredCreators, eventCreators }: Crea
                 <h3 className="font-display uppercase tracking-wider text-xl m-0">{creator.name}</h3>
                 {creator.address && <p className="text-xs text-gray-400 m-0">{creator.address}</p>}
                 <button
-                  onClick={() => openCreatorProfile(creator.id)}
+                  onClick={() => {
+                    openCreatorProfile(creator.id);
+                    trackEvent("click_map_pin", {
+                      creator_name: creator.name,
+                    });
+                  }}
                   className={`text-xs font-bold uppercase tracking-widest py-2 mt-2 brutalist-border brutalist-shadow transition-colors ${isDarkMode ? "bg-white text-black hover:bg-gray-200" : "bg-black text-white hover:bg-gray-800"}`}
                 >
                   View Details
@@ -142,24 +148,29 @@ export function CreatorMap({ isDarkMode, filteredCreators, eventCreators }: Crea
                   <p className="text-xs text-gray-500 m-0">{m.event.address || m.event.location}</p>
                 )}
                 <button
-                  onClick={() => openEvent({
-                    id: m.creator.id,
-                    _eventIdx: m.idx,
-                    name: m.event.title || "Untitled Event",
-                    description: m.event.description,
-                    coverImage: m.event.coverImage || m.creator.coverImage,
-                    subCategories: m.event.category ? [m.event.category] : [],
-                    location: m.event.location,
-                    address: m.event.address || "",
-                    eventDate: m.event.startDate,
-                    endDate: m.event.endDate,
-                    startTime: m.event.startTime,
-                    endTime: m.event.endTime,
-                    publishedFrom: m.event.publishedFrom,
-                    creatorName: m.creator.name,
-                    creatorImage: m.creator.profileImage,
-                    creatorId: m.creator.id,
-                  })}
+                  onClick={() => {
+                    openEvent({
+                      id: m.creator.id,
+                      _eventIdx: m.idx,
+                      name: m.event.title || "Untitled Event",
+                      description: m.event.description,
+                      coverImage: m.event.coverImage || m.creator.coverImage,
+                      subCategories: m.event.category ? [m.event.category] : [],
+                      location: m.event.location,
+                      address: m.event.address || "",
+                      eventDate: m.event.startDate,
+                      endDate: m.event.endDate,
+                      startTime: m.event.startTime,
+                      endTime: m.event.endTime,
+                      publishedFrom: m.event.publishedFrom,
+                      creatorName: m.creator.name,
+                      creatorImage: m.creator.profileImage,
+                      creatorId: m.creator.id,
+                    });
+                    trackEvent("click_map_pin", {
+                      event_title: m.event.title || "Untitled Event",
+                    });
+                  }}
                   className={`text-xs font-bold uppercase tracking-widest py-2 mt-2 brutalist-border brutalist-shadow transition-colors ${isDarkMode ? "bg-white text-black hover:bg-gray-200" : "bg-black text-white hover:bg-gray-800"}`}
                 >
                   View Event

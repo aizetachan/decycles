@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUI, JoinModalMode } from '../../contexts/UIContext';
 import { useT } from '../../contexts/LanguageContext';
+import { trackEvent } from "../../lib/analytics";
 
 interface JoinModalProps {
   isOpen: boolean;
@@ -116,8 +117,13 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, isDarkMod
     setErrorMsg(null);
     setStatus('submitting');
     try {
-      await signup(email, password, firstName, lastName, joinType || 'user');
+      const type = joinType || 'user';
+      await signup(email, password, firstName, lastName, type);
       setStatus('success');
+      trackEvent("sign_up", {
+        method: "email",
+        join_type: type,
+      });
       setTimeout(() => {
         handleClose();
         navigate('/profile/edit');
@@ -136,6 +142,9 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, isDarkMod
     try {
       await login(email, password);
       setStatus('success');
+      trackEvent("login", {
+        method: "email",
+      });
       setTimeout(() => {
         handleClose();
       }, 800);
@@ -152,8 +161,19 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, isDarkMod
     try {
       // For sign-in, never pass a role — loginWithGoogle preserves the existing
       // doc when the user already exists. For sign-up, pass the chosen role.
-      await loginWithGoogle(mode === 'signup' ? joinType || 'user' : undefined);
+      const type = mode === 'signup' ? joinType || 'user' : undefined;
+      await loginWithGoogle(type);
       setStatus('success');
+      if (mode === 'signup') {
+        trackEvent("sign_up", {
+          method: "google",
+          join_type: type || "user",
+        });
+      } else {
+        trackEvent("login", {
+          method: "google",
+        });
+      }
       setTimeout(() => {
         handleClose();
         if (mode === 'signup') navigate('/profile/edit');

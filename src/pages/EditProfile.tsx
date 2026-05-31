@@ -21,6 +21,7 @@ import { EVENT_CATEGORIES } from "../constants/categories";
 import { useCategories } from "../contexts/CategoriesContext";
 import { EventRowAttendees, EventAttendeesPanel } from "../components/events/EventAttendees";
 import { GalleryManager } from "../components/ui/GalleryManager";
+import { trackEvent } from "../lib/analytics";
 
 // Centered, full-cover overlay used on top of any image dropzone while an upload is in flight.
 function UploadSpinnerOverlay() {
@@ -67,6 +68,9 @@ export function EventsTab({ isDarkMode, profileData, setProfileData, uid, showAt
     });
 
   const addEvent = () => {
+    trackEvent("click_create_event", {
+      creator_id: uid,
+    });
     const newIdx = events.length;
     setProfileData({
       ...profileData,
@@ -369,6 +373,12 @@ export function EventEditorItem({
               }
               newEvents[idx] = next;
               setProfileData({ ...profileData, events: newEvents });
+
+              trackEvent(next.isPublished ? "publish_event" : "unpublish_event", {
+                event_title: event.title || "Untitled",
+                event_category: event.category || "None",
+                published_from: next.publishedFrom || "shop",
+              });
             }}
             className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest border-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               event.isPublished
