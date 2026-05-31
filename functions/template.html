@@ -44,13 +44,26 @@
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
+      
+      // Default consent set to denied, check localStorage to restore returning users
+      try {
+        var consent = localStorage.getItem('decycles-cookie-consent');
+        gtag('consent', 'default', {
+          'analytics_storage': consent === 'accepted' ? 'granted' : 'denied'
+        });
+      } catch (e) {
+        gtag('consent', 'default', {
+          'analytics_storage': 'denied'
+        });
+      }
+
       gtag('js', new Date());
       gtag('config', 'G-45YTR26RLE', {
         send_page_view: false
       });
     </script>
-    <script type="module" crossorigin src="/assets/index-CHlShMEG.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-h0bfRBii.css">
+    <script type="module" crossorigin src="/assets/index-DdZeSTGR.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CTcyETkn.css">
   </head>
   <body>
     <div id="root"></div>
