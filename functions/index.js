@@ -33,8 +33,13 @@ const ADMIN_SDK_SA =
  *
  * Other custom claims (if we add any in the future) are preserved.
  */
+// NOTE: this Eventarc-triggered function stays on the default runtime SA.
+// Moving it to ADMIN_SDK_SA fails to deploy because that SA lacks the
+// `eventarc.events.receiveEvent` permission the trigger requires. If
+// role→admin-claim sync ever fails with auth/insufficient-permission, grant
+// the default compute SA the "Firebase Authentication Admin" role instead.
 exports.syncAdminClaim = onDocumentWritten(
-  { document: "users/{userId}", region: "us-central1", serviceAccount: ADMIN_SDK_SA },
+  { document: "users/{userId}", region: "us-central1" },
   async (event) => {
     const before = event.data?.before?.data();
     const after = event.data?.after?.data();
