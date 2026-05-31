@@ -5,6 +5,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useDropzone } from 'react-dropzone';
 import { db } from '../../firebase';
 import { useUI } from '../../contexts/UIContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { Creator, Category, SubCategory } from '../../types';
 import { Save, ArrowLeft, Plus, Trash2, Upload, MapPin, Loader2, ChevronDown, ChevronUp, Search, X, Calendar as CalIcon } from 'lucide-react';
 import { DatePicker } from '../../components/ui/DatePicker';
@@ -288,6 +289,7 @@ export function AdminCreatorEdit() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isDarkMode } = useUI();
+  const { currentUser, userProfile } = useAuth();
   const { selectableCategories: SELECTABLE_CATEGORIES, subcategories: SUBCATEGORIES, getFlattenedSubcategories } = useCategories();
   const isNew = !id;
 
@@ -536,6 +538,17 @@ export function AdminCreatorEdit() {
         twitter: normalizeUrl(formData.socials?.twitter),
       },
     };
+    // Activity timestamps for the dashboard. `createdAt`/`createdBy` are
+    // preserved (formData carries them via the loaded doc through ...rest) or
+    // set now for brand-new shops, attributed to the admin who created it.
+    const nowIso = new Date().toISOString();
+    payload.updatedAt = nowIso;
+    payload.createdAt = (formData as any).createdAt || nowIso;
+    if (isNew) {
+      const adminName = `${(userProfile as any)?.firstName || ''} ${(userProfile as any)?.lastName || ''}`.trim()
+        || (userProfile as any)?.name || (userProfile as any)?.email || 'Admin';
+      payload.createdBy = { id: currentUser?.uid || null, name: adminName, viaAdmin: true };
+    }
     if (hasAddress && coordinates) payload.coordinates = coordinates;
     await setDoc(doc(db, 'creators', docId), stripUndefined(payload));
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Globe, MapPin, Maximize2, Heart, Share2, Check, Loader2 } from "lucide-react";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, increment } from "firebase/firestore";
 import { creators as seedCreators } from "../../data";
 import { useUI } from "../../contexts/UIContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -107,14 +107,26 @@ export function CreatorProfileModal() {
     }
   };
 
-  // Track profile view in Google Analytics
+  // Track profile view: Google Analytics + a Firestore counter (`views`) that
+  // powers the admin dashboard's "most visited" metric. `viewedRef` dedupes so
+  // a single open counts once even if the effect re-runs.
+  const viewedRef = React.useRef<string | null>(null);
   useEffect(() => {
-    if (selectedCreator && selectedCreatorId) {
-      trackEvent("view_creator_profile", {
-        creator_id: selectedCreator.id === "current-user" ? currentUser?.uid : selectedCreator.id,
-        creator_name: selectedCreator.name,
-        creator_category: selectedCreator.categories?.join(", ") || "",
-      });
+    if (!selectedCreator || !selectedCreatorId) return;
+    const realId = selectedCreator.id;
+    if (viewedRef.current === selectedCreatorId) return;
+    viewedRef.current = selectedCreatorId;
+
+    trackEvent("view_creator_profile", {
+      creator_id: realId === "current-user" ? currentUser?.uid : realId,
+      creator_name: selectedCreator.name,
+      creator_category: selectedCreator.categories?.join(", ") || "",
+    });
+
+    // Count the view on real creator docs only (skip the "current-user" self
+    // preview). Best-effort — never block the UI on the counter.
+    if (realId && realId !== "current-user") {
+      updateDoc(doc(db, "creators", realId), { views: increment(1) }).catch(() => {});
     }
   }, [selectedCreator?.id, selectedCreatorId, currentUser?.uid]);
 

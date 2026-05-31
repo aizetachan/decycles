@@ -30,8 +30,12 @@ service cloud.firestore {
       // Admins can write any creator doc.
       // A creator (role = 'creator') can write only their own doc, where the
       // doc id matches their uid.
+      // Anyone may bump the public view counter, but ONLY the `views` field —
+      // no other field can change in the same write. Powers the dashboard's
+      // "most visited" metric without exposing the rest of the doc.
       allow create, update: if isAdmin()
-        || (isSignedIn() && request.auth.uid == creatorId);
+        || (isSignedIn() && request.auth.uid == creatorId)
+        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views']);
       allow delete: if isAdmin();
     }
 

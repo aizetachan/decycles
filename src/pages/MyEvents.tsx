@@ -125,7 +125,10 @@ export function MyEvents() {
       payload.categories = ["Events"];
       payload.subCategories = [];
       payload.gallery = [];
+      payload.createdAt = up.createdAt || new Date().toISOString();
     }
+    // Editing events counts as activity on the shop for the dashboard.
+    payload.updatedAt = new Date().toISOString();
     await setDoc(doc(db, "creators", currentUser.uid), stripUndefined(payload), { merge: true });
     setLoadedSnapshot(JSON.stringify(profileData.events));
   };

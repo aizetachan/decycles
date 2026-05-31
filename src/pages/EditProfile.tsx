@@ -1055,6 +1055,10 @@ export function EditProfile() {
         }
         const c: any = snap.data();
         setProfileData((prev) => {
+          // Preserve the original creation timestamp across saves (dashboard
+          // "last created" reads it). undefined for legacy docs created before
+          // we started stamping — those get one on their next save.
+          creatorCreatedAtRef.current = c.createdAt;
           // Events come back for everyone — that's the whole point of the
           // user-role flow (so non-creator users can also publish events).
           const next: any = { ...prev, events: c.events || [] };
@@ -1127,6 +1131,8 @@ export function EditProfile() {
   // Save button. Publishing stays a deliberate action via its own toggle.
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savingRef = useRef(false);
+  // Original shop creation timestamp, captured on load so saves preserve it.
+  const creatorCreatedAtRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     // Don't run until the initial Firestore hydrate has set a snapshot.
     if (loadedSnapshot === null || !currentUser) return;
@@ -1319,6 +1325,19 @@ export function EditProfile() {
         creatorImage: profileData.shopProfileImage || profileData.profileImage || "",
         isPublished,
       };
+      // Activity timestamps for the admin dashboard. `updatedAt` bumps on every
+      // save; `createdAt` + `createdBy` are set once and preserved thereafter
+      // (merge:true keeps them when we don't re-write them).
+      const nowIso = new Date().toISOString();
+      (creatorDoc as any).updatedAt = nowIso;
+      if (!creatorCreatedAtRef.current) {
+        (creatorDoc as any).createdAt = nowIso;
+        // Self-created shop → the creator is the owner.
+        (creatorDoc as any).createdBy = { id: currentUser.uid, name: fullName };
+      } else {
+        (creatorDoc as any).createdAt = creatorCreatedAtRef.current;
+      }
+      creatorCreatedAtRef.current = (creatorDoc as any).createdAt;
       // Firestore rejects `undefined` — only include coordinates when present
       // AND the shop has a real address. Worldwide/remote shops never pin.
       if (hasAddress && profileData.coordinates) {
