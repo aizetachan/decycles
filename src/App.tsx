@@ -25,8 +25,6 @@ import { EventModal } from "./components/modals/EventModal";
 import { useUI } from "./contexts/UIContext";
 import { useAuth } from "./contexts/AuthContext";
 import { Ban } from "lucide-react";
-import { logEvent } from "firebase/analytics";
-import { analytics } from "./firebase";
 
 /**
  * Full-screen lock shown when a signed-in user's `users/{uid}.blocked` flag is
@@ -77,8 +75,9 @@ export default function App() {
   const location = useLocation();
 
   useEffect(() => {
-    if (analytics) {
-      logEvent(analytics, "page_view", {
+    const gtag = (window as any).gtag;
+    if (gtag) {
+      gtag("event", "page_view", {
         page_path: location.pathname + location.search,
         page_title: document.title || "Decycles",
       });
