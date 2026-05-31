@@ -1,0 +1,36 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Admin status comes from the `admin` custom claim, kept in sync with
+    // users/{uid}.role by the syncAdminClaim Cloud Function. This avoids any
+    // cross-service Firestore lookups (faster, free, no IAM dance).
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    // Public read for everything (so Home / CreatorProfile can render images
+    // without needing authenticated download URLs).
+    match /{allPaths=**} {
+      allow read: if true;
+    }
+
+    // A creator can write under creators/{uid}/...
+    // Admins can write under any creators/{anyId}/...
+    match /creators/{creatorId}/{allPaths=**} {
+      allow write: if isAdmin()
+        || (isSignedIn() && request.auth.uid == creatorId);
+    }
+
+    // A user can write under users/{uid}/...
+    match /users/{userId}/{allPaths=**} {
+      allow write: if isAdmin()
+        || (isSignedIn() && request.auth.uid == userId);
+    }
+  }
+}

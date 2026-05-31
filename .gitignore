@@ -1,0 +1,13 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Firebase Admin SDK service account credentials — never commit
+scripts/service-account.json
+**/service-account*.json
+serviceAccountKey.json

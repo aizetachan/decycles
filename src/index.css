@@ -1,0 +1,177 @@
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Anton", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-rad-black: #050505;
+  --color-rad-white: #f5f5f5;
+  --color-rad-neon: #ccff00; /* Rad Race often uses yellow/green neon */
+}
+
+body {
+  background-color: var(--color-rad-white);
+  color: var(--color-rad-black);
+  font-family: var(--font-sans);
+}
+
+body.dark {
+  background-color: var(--color-rad-black);
+  color: var(--color-rad-white);
+}
+
+/* Custom scrollbar */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-rad-white);
+    border-left: 1px solid var(--color-rad-black);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-rad-black);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-rad-neon);
+  }
+  body.dark ::-webkit-scrollbar-track {
+    background: var(--color-rad-black);
+    border-left: 1px solid var(--color-rad-white);
+  }
+  body.dark ::-webkit-scrollbar-thumb {
+    background: var(--color-rad-white);
+  }
+  body.dark ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-rad-neon);
+  }
+
+  /* For Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-rad-black) var(--color-rad-white);
+  }
+  body.dark * {
+    scrollbar-color: var(--color-rad-white) var(--color-rad-black);
+  }
+}
+
+@media (max-width: 767px) {
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  * {
+    scrollbar-width: none;
+  }
+}
+
+/* Hide scrollbar for elements with no-scrollbar class */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+/* Leaflet ↔ Tailwind preflight fix. Tailwind sets
+   `img { max-width: 100%; height: auto; }` globally, which collapses
+   Leaflet's marker / tile images (they sit in absolutely-positioned panes
+   with a 0-width containing block). Without this override pins render
+   invisible on first-load — especially on mobile + retina, where the 2x
+   icon URL is requested. */
+.leaflet-container img,
+.leaflet-container svg,
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-image-layer,
+.leaflet-tile {
+  max-width: none !important;
+  max-height: none !important;
+}
+
+/* Attribution control — kept for licensing, but no gray fill and text colour
+   tuned to whichever map theme is showing. */
+.leaflet-control-attribution {
+  background: transparent !important;
+  color: var(--color-rad-black) !important;
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.5);
+}
+.leaflet-control-attribution a {
+  color: var(--color-rad-black) !important;
+}
+body.dark .leaflet-control-attribution {
+  color: var(--color-rad-white) !important;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+}
+body.dark .leaflet-control-attribution a {
+  color: var(--color-rad-white) !important;
+}
+
+/* Brutalist Shadows / Borders.
+   Wrapped in `@layer base` so any Tailwind border utility at the call site
+   (which lives in `@layer utilities`, a later cascade layer) overrides the
+   `border-color`. Without this layer the rule wins by cascade-layer order
+   regardless of specificity. */
+@layer base {
+  .brutalist-border {
+    border: 2px solid var(--color-rad-black);
+  }
+}
+
+.brutalist-shadow {
+  transition: all 0.1s ease;
+}
+.brutalist-shadow:hover {
+}
+.brutalist-shadow:active {
+}
+
+body.dark .brutalist-shadow {
+}
+body.dark .brutalist-shadow:hover {
+}
+body.dark .brutalist-shadow:active {
+}
+
+/* Marquee — text fills almost the full band height. Padding kept tiny
+   (just enough for descenders) and line-height tight so the band hugs
+   the type. The animation translates by -50%; the JSX must render an
+   even number of identical copies for the loop to land on a copy
+   boundary (no visible gap). */
+.marquee-container {
+  overflow: hidden;
+  white-space: nowrap;
+  background: var(--color-rad-neon);
+  color: var(--color-rad-black);
+  padding: 4px 0;
+  border-top: 2px solid var(--color-rad-black);
+  border-bottom: 2px solid var(--color-rad-black);
+  font-family: var(--font-display);
+  font-size: clamp(2.25rem, 8vw, 5.5rem);
+  line-height: 1;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+body.dark .marquee-container {
+  border-top: 2px solid var(--color-rad-white);
+  border-bottom: 2px solid var(--color-rad-white);
+}
+
+.marquee-content {
+  display: inline-block;
+  animation: marquee 40s linear infinite;
+}
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}

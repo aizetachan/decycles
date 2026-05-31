@@ -1,0 +1,62 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Admin status comes from the `admin` custom claim, kept in sync with
+    // users/{uid}.role by the syncAdminClaim Cloud Function. The claim is
+    // already in request.auth.token, so rules don't need any cross-doc reads.
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    match /users/{userId} {
+      allow read: if true;
+      // Self-signup creates the doc with the user's own uid.
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      // A user can update their own doc; admins can update any user doc
+      // (needed for the admin panel to change roles, etc.).
+      allow update: if isAdmin()
+        || (isSignedIn() && request.auth.uid == userId);
+      allow delete: if isAdmin();
+    }
+
+    match /creators/{creatorId} {
+      allow read: if true;
+      // Admins can write any creator doc.
+      // A creator (role = 'creator') can write only their own doc, where the
+      // doc id matches their uid.
+      allow create, update: if isAdmin()
+        || (isSignedIn() && request.auth.uid == creatorId);
+      allow delete: if isAdmin();
+    }
+
+    match /events/{eventId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Categories taxonomy — public read (so home/filters/picker render),
+    // admin-only write (managed from /admin/categories).
+    match /taxonomy/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Event RSVPs — one document per (event, user). Doc id is
+    // `{creatorId}_{eventIdx}_{userId}` so the system stays simple (no
+    // subcollections, dedupe is implicit). Anyone can read counts; only the
+    // owner of the RSVP (matching userId in the doc) can create/update/delete.
+    match /rsvps/{rsvpId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+    }
+  }
+}
