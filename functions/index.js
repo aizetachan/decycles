@@ -17,6 +17,14 @@ const { getFirestore } = require("firebase-admin/firestore");
 
 initializeApp();
 
+// The Gen2 default runtime SA (PROJECT_NUMBER-compute@…) lacks Firebase Auth
+// admin permission, so getAuth() admin operations (setCustomUserClaims,
+// updateUser, deleteUser) fail with auth/insufficient-permission. Run the
+// functions that need them on the dedicated firebase-adminsdk SA instead,
+// which already holds "Firebase Authentication Admin".
+const ADMIN_SDK_SA =
+  "firebase-adminsdk-fbsvc@decycles-web-app-1777399378.iam.gserviceaccount.com";
+
 /**
  * When users/{uid}.role changes, mirror it onto the user's custom claims.
  *
@@ -26,7 +34,7 @@ initializeApp();
  * Other custom claims (if we add any in the future) are preserved.
  */
 exports.syncAdminClaim = onDocumentWritten(
-  { document: "users/{userId}", region: "us-central1" },
+  { document: "users/{userId}", region: "us-central1", serviceAccount: ADMIN_SDK_SA },
   async (event) => {
     const before = event.data?.before?.data();
     const after = event.data?.after?.data();
@@ -70,7 +78,9 @@ const assertAdmin = (request) => {
 
 // Change a user's real authentication email (the one they log in with) and
 // mirror it onto their users/{uid} doc.
-exports.adminUpdateUserEmail = onCall({ region: "us-central1" }, async (request) => {
+exports.adminUpdateUserEmail = onCall(
+  { region: "us-central1", serviceAccount: ADMIN_SDK_SA },
+  async (request) => {
   assertAdmin(request);
   const uid = String(request.data?.uid || "").trim();
   const email = String(request.data?.email || "").trim();
@@ -99,7 +109,9 @@ exports.adminUpdateUserEmail = onCall({ region: "us-central1" }, async (request)
 
 // Fully delete a user: their Firestore docs (users + creators) and their Auth
 // account. Admins can't delete their own account (avoids self-lockout).
-exports.adminDeleteUser = onCall({ region: "us-central1" }, async (request) => {
+exports.adminDeleteUser = onCall(
+  { region: "us-central1", serviceAccount: ADMIN_SDK_SA },
+  async (request) => {
   assertAdmin(request);
   const uid = String(request.data?.uid || "").trim();
   if (!uid) throw new HttpsError("invalid-argument", "uid is required.");
