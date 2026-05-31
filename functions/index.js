@@ -142,6 +142,46 @@ exports.adminDeleteUser = onCall(
   }
 });
 
+// List "orphaned" Auth accounts: users that exist in Firebase Authentication
+// but no longer have a users/{uid} Firestore profile (e.g. an earlier failed
+// delete removed the doc but not the Auth account). Lets an admin review and
+// clean them up deliberately. Read-only — never deletes anything.
+exports.adminListOrphanedUsers = onCall(
+  { region: "us-central1", serviceAccount: ADMIN_SDK_SA },
+  async (request) => {
+    assertAdmin(request);
+    try {
+      const usersSnap = await getFirestore().collection("users").get();
+      const knownIds = new Set(usersSnap.docs.map((d) => d.id));
+      const orphans = [];
+      let pageToken = undefined;
+      do {
+        const res = await getAuth().listUsers(1000, pageToken);
+        res.users.forEach((u) => {
+          if (!knownIds.has(u.uid)) {
+            orphans.push({
+              uid: u.uid,
+              email: u.email || "",
+              displayName: u.displayName || "",
+              provider: (u.providerData || []).map((p) => p.providerId).join(", "),
+              creationTime: u.metadata?.creationTime || "",
+              lastSignInTime: u.metadata?.lastSignInTime || "",
+              disabled: !!u.disabled,
+            });
+          }
+        });
+        pageToken = res.pageToken;
+      } while (pageToken);
+      // Newest first.
+      orphans.sort((a, b) => (b.creationTime || "").localeCompare(a.creationTime || ""));
+      return { orphans };
+    } catch (err) {
+      logger.error("[adminListOrphanedUsers] failed:", err);
+      throw new HttpsError("internal", err?.message || "Failed to list orphaned users.");
+    }
+  },
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SSR for shared event links: returns the React shell with the event's title,
 // description, and cover image baked into the OG meta tags. WhatsApp / Slack /

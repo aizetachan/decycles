@@ -6,7 +6,7 @@ import { db, functions } from '../../firebase';
 import { useUI } from '../../contexts/UIContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { uploadImage } from '../../lib/upload';
-import { Shield, User, ShieldAlert, Search, X, Trash2, Ban, Loader2, Plus } from 'lucide-react';
+import { Shield, User, ShieldAlert, Search, X, Trash2, Ban, Loader2, Plus, UserX, AlertTriangle, RefreshCw } from 'lucide-react';
 
 type Role = 'user' | 'creator' | 'admin';
 
@@ -28,6 +28,45 @@ export function Users() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Orphaned Auth accounts (exist in Authentication but have no Firestore
+  // profile — e.g. from an earlier failed delete). Listed on demand; the admin
+  // deletes them deliberately.
+  const [orphans, setOrphans] = useState<any[] | null>(null);
+  const [orphansLoading, setOrphansLoading] = useState(false);
+  const [orphansError, setOrphansError] = useState<string | null>(null);
+  const [deletingOrphan, setDeletingOrphan] = useState<string | null>(null);
+
+  const scanOrphans = async () => {
+    setOrphansLoading(true);
+    setOrphansError(null);
+    try {
+      const list = httpsCallable(functions, 'adminListOrphanedUsers');
+      const res: any = await list({});
+      setOrphans(res?.data?.orphans || []);
+    } catch (err: any) {
+      console.error(err);
+      setOrphansError(err?.message || 'Failed to scan orphaned accounts');
+    } finally {
+      setOrphansLoading(false);
+    }
+  };
+
+  const deleteOrphan = async (uid: string, label: string) => {
+    if (!window.confirm(`Permanently delete the orphaned Auth account ${label}? This removes it from Firebase Authentication.`)) return;
+    setDeletingOrphan(uid);
+    setOrphansError(null);
+    try {
+      const del = httpsCallable(functions, 'adminDeleteUser');
+      await del({ uid });
+      setOrphans((prev) => (prev ? prev.filter((o) => o.uid !== uid) : prev));
+    } catch (err: any) {
+      console.error(err);
+      setOrphansError(err?.message || 'Failed to delete account');
+    } finally {
+      setDeletingOrphan(null);
+    }
+  };
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -199,6 +238,75 @@ export function Users() {
       {/* Result count */}
       <div className={`text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
         {loading ? "Loading..." : `${filtered.length} user${filtered.length === 1 ? "" : "s"}${search ? " (filtered)" : ""}`}
+      </div>
+
+      {/* Orphaned Auth accounts — exist in Authentication but have no Firestore
+          profile (e.g. an earlier failed delete). Review and clean up here. */}
+      <div className={`border-2 ${isDarkMode ? "border-zinc-800 bg-zinc-900" : "border-gray-200 bg-white"}`}>
+        <div className="flex items-center justify-between gap-3 p-4">
+          <div className="flex items-center gap-2 min-w-0">
+            <UserX className={`w-4 h-4 shrink-0 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`} />
+            <div className="min-w-0">
+              <div className="text-xs font-bold uppercase tracking-widest">Orphaned auth accounts</div>
+              <div className={`text-[11px] ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+                Accounts in Authentication with no profile — usually a failed delete. Delete them when ready.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={scanOrphans}
+            disabled={orphansLoading}
+            className={`inline-flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest border-2 transition-colors disabled:opacity-50 shrink-0 ${
+              isDarkMode ? "border-zinc-700 text-white hover:bg-white/10" : "border-gray-300 text-black hover:bg-black/5"
+            }`}
+          >
+            {orphansLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            {orphansLoading ? "Scanning…" : orphans === null ? "Scan" : "Rescan"}
+          </button>
+        </div>
+
+        {orphansError && (
+          <div className="px-4 pb-3 text-xs font-bold text-red-500">{orphansError}</div>
+        )}
+
+        {orphans !== null && (
+          orphans.length === 0 ? (
+            <div className={`px-4 pb-4 text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
+              ✓ No orphaned accounts — Auth and profiles are in sync.
+            </div>
+          ) : (
+            <div className={`border-t-2 ${isDarkMode ? "border-zinc-800" : "border-gray-200"}`}>
+              <div className={`px-4 py-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest ${isDarkMode ? "text-yellow-400" : "text-yellow-600"}`}>
+                <AlertTriangle className="w-3.5 h-3.5" /> {orphans.length} orphaned account{orphans.length === 1 ? "" : "s"} found
+              </div>
+              {orphans.map((o) => (
+                <div key={o.uid} className={`flex items-center gap-3 px-4 py-3 border-t-2 ${isDarkMode ? "border-zinc-800" : "border-gray-100"}`}>
+                  <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
+                    <UserX className="w-4 h-4 text-red-500" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">{o.email || o.displayName || "(no email)"}</div>
+                    <div className={`text-[10px] truncate ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+                      {o.provider || "—"}{o.creationTime ? ` · created ${new Date(o.creationTime).toLocaleDateString()}` : ""} · {o.uid}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => deleteOrphan(o.uid, o.email || o.uid)}
+                    disabled={deletingOrphan === o.uid}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border-2 transition-colors disabled:opacity-50 shrink-0 ${
+                      isDarkMode ? "border-red-500/50 text-red-400 hover:bg-red-500/10" : "border-red-500/50 text-red-600 hover:bg-red-50"
+                    }`}
+                  >
+                    {deletingOrphan === o.uid ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+          )
+        )}
       </div>
 
       {/* Table — read-only. Click any row to open the edit modal. */}
