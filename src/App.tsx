@@ -23,8 +23,39 @@ import { JoinModal } from "./components/modals/JoinModal";
 import { CreatorProfileModal } from "./components/modals/CreatorProfileModal";
 import { EventModal } from "./components/modals/EventModal";
 import { useUI } from "./contexts/UIContext";
+import { useAuth } from "./contexts/AuthContext";
+import { Ban } from "lucide-react";
 import { logEvent } from "firebase/analytics";
 import { analytics } from "./firebase";
+
+/**
+ * Full-screen lock shown when a signed-in user's `users/{uid}.blocked` flag is
+ * true. An admin sets this from /admin/users. The flag is live-subscribed in
+ * AuthContext, so blocking takes effect immediately on the user's session.
+ * Blocked users can still sign out (the only allowed action).
+ */
+function BlockedScreen() {
+  const { logout, userProfile } = useAuth();
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6 bg-black text-white text-center">
+      <div className="max-w-md flex flex-col items-center gap-5">
+        <Ban className="w-14 h-14 text-red-500" />
+        <h1 className="text-2xl font-black uppercase tracking-tighter">Account blocked</h1>
+        <p className="text-sm text-gray-400">
+          {userProfile?.name ? `${userProfile.name}, your` : "Your"} account has been blocked by an administrator.
+          You can't use the platform right now. If you think this is a mistake, please contact support.
+        </p>
+        <button
+          type="button"
+          onClick={() => logout()}
+          className="px-6 py-3 text-xs font-bold uppercase tracking-widest border-2 border-white hover:bg-white hover:text-black transition-colors"
+        >
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Backward-compat handler for deep links to /creator/:id. The page is now a
@@ -42,6 +73,7 @@ function CreatorDeepLinkRedirect() {
 
 export default function App() {
   const { isDarkMode, isJoinModalOpen, setIsJoinModalOpen } = useUI();
+  const { currentUser, userProfile } = useAuth();
   const location = useLocation();
 
   useEffect(() => {
@@ -52,6 +84,13 @@ export default function App() {
       });
     }
   }, [location]);
+
+  // Hard stop for blocked users — overrides all routes so they can't reach any
+  // page (except sign-out, inside BlockedScreen). The reset-password flow is
+  // exempt so a blocked user following an email link isn't trapped.
+  if (currentUser && userProfile?.blocked && location.pathname !== "/reset-password") {
+    return <BlockedScreen />;
+  }
 
   return (
     <>
