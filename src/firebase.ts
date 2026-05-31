@@ -11,7 +11,8 @@ const firebaseConfig = {
   projectId: "decycles-web-app-1777399378",
   storageBucket: "decycles-web-app-1777399378.firebasestorage.app",
   messagingSenderId: "757330802529",
-  appId: "1:757330802529:web:9a9df014df77415b93b720"
+  appId: "1:757330802529:web:9a9df014df77415b93b720",
+  measurementId: "G-45YTR26RLE"
 };
 
 // Initialize Firebase
