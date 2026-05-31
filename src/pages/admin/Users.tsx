@@ -49,31 +49,91 @@ export function Users() {
   const openEdit = (user: any) => {
     setEditing(user);
     setDraftRole((user.role as Role) || 'user');
+    setDraftFirstName(user.firstName || '');
+    setDraftLastName(user.lastName || '');
+    setDraftEmail(user.email || '');
+    setDraftProfileImage(user.profileImage || '');
+    setDraftBlocked(!!user.blocked);
     setSaveError(null);
   };
   const closeEdit = () => {
-    if (saving) return;
+    if (saving || deleting) return;
     setEditing(null);
     setSaveError(null);
   };
 
+  // The admin's own row — block/delete on yourself is disabled to avoid lockout.
+  const isSelf = !!editing && !!currentUser && editing.id === currentUser.uid;
+
+  const onAvatarDrop = async (files: File[]) => {
+    if (!files.length || !editing) return;
+    setSaveError(null);
+    setAvatarUploading(true);
+    try {
+      const url = await uploadImage(files[0], `users/${editing.id}/avatar`);
+      setDraftProfileImage(url);
+    } catch (err: any) {
+      console.error(err);
+      setSaveError(err?.message || 'Avatar upload failed');
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+  const { getRootProps: getAvatarRootProps, getInputProps: getAvatarInputProps, isDragActive: isAvatarDragActive } =
+    useDropzone({ onDrop: onAvatarDrop, accept: { 'image/*': [] }, maxFiles: 1 } as any);
+
   const saveEdit = async () => {
     if (!editing) return;
-    if (draftRole === editing.role) {
-      closeEdit();
-      return;
-    }
     setSaving(true);
     setSaveError(null);
     try {
-      await updateDoc(doc(db, 'users', editing.id), { role: draftRole });
-      setUsers(users.map(u => u.id === editing.id ? { ...u, role: draftRole } : u));
+      const fullName = `${draftFirstName} ${draftLastName}`.trim();
+      // 1. Firestore profile fields (name, avatar, role, blocked flag).
+      const patch: any = {
+        firstName: draftFirstName,
+        lastName: draftLastName,
+        name: fullName,
+        profileImage: draftProfileImage,
+        role: draftRole,
+        // Don't let an admin lock themselves out.
+        blocked: isSelf ? false : draftBlocked,
+      };
+      await updateDoc(doc(db, 'users', editing.id), patch);
+
+      // 2. Email change → real login email via Cloud Function (Admin SDK). The
+      // function also mirrors it onto the Firestore doc.
+      const emailChanged = draftEmail.trim() && draftEmail.trim() !== (editing.email || '');
+      if (emailChanged) {
+        const updateEmail = httpsCallable(functions, 'adminUpdateUserEmail');
+        await updateEmail({ uid: editing.id, email: draftEmail.trim() });
+      }
+
+      setUsers(users.map(u => (u.id === editing.id ? { ...u, ...patch, email: draftEmail.trim() || u.email } : u)));
       setEditing(null);
     } catch (err: any) {
       console.error(err);
-      setSaveError(err?.message || 'Error updating role');
+      setSaveError(err?.message || 'Error saving user');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const deleteUser = async () => {
+    if (!editing || isSelf) return;
+    const label = editing.name || `${editing.firstName || ''} ${editing.lastName || ''}`.trim() || editing.email || 'this user';
+    if (!window.confirm(`Permanently delete ${label}? This removes their account and profile from the database and cannot be undone.`)) return;
+    setDeleting(true);
+    setSaveError(null);
+    try {
+      const del = httpsCallable(functions, 'adminDeleteUser');
+      await del({ uid: editing.id });
+      setUsers(users.filter(u => u.id !== editing.id));
+      setEditing(null);
+    } catch (err: any) {
+      console.error(err);
+      setSaveError(err?.message || 'Error deleting user');
+    } finally {
+      setDeleting(false);
     }
   };
 
