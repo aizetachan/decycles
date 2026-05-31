@@ -1,19 +1,32 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { useDropzone } from 'react-dropzone';
+import { db, functions } from '../../firebase';
 import { useUI } from '../../contexts/UIContext';
-import { Shield, User, ShieldAlert, Search, X } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { uploadImage } from '../../lib/upload';
+import { Shield, User, ShieldAlert, Search, X, Trash2, Ban, Loader2, Plus } from 'lucide-react';
 
 type Role = 'user' | 'creator' | 'admin';
 
 export function Users() {
   const { isDarkMode } = useUI();
+  const { currentUser } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<any | null>(null);
+  // Editable drafts for the open user.
   const [draftRole, setDraftRole] = useState<Role>("user");
+  const [draftFirstName, setDraftFirstName] = useState("");
+  const [draftLastName, setDraftLastName] = useState("");
+  const [draftEmail, setDraftEmail] = useState("");
+  const [draftProfileImage, setDraftProfileImage] = useState("");
+  const [draftBlocked, setDraftBlocked] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const fetchUsers = async () => {
