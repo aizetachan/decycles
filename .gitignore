@@ -11,3 +11,6 @@ coverage/
 scripts/service-account.json
 **/service-account*.json
 serviceAccountKey.json
+
+# Temporary scratch folder
+scratch/
