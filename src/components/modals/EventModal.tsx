@@ -168,9 +168,10 @@ export function EventModal() {
                     {dateLabel}{timeLabel ? ` · ${timeLabel}` : ""}
                   </span>
                 )}
-                {e?.location && (
+                {(e?.address || e?.location) && (
                   <span className="inline-flex items-center gap-2">
-                    <MapPin className="w-4 h-4 opacity-70" /> {e.location}
+                    <MapPin className="w-4 h-4 opacity-70" />
+                    {e?.location && e?.address ? `${e.location} · ${e.address}` : e?.address || e?.location}
                   </span>
                 )}
                 {e?.subCategories?.[0] && (() => {

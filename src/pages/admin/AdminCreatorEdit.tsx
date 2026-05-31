@@ -282,6 +282,111 @@ type AdminFormData = Partial<Creator> & {
   events?: any[];
 };
 
+// Per-event location editor: its own geocoded address (independent of the
+// shop), a one-click "Use shop location", and a required-location warning.
+// Mirrors the creator-side EditProfile so admin-managed events behave the same.
+function AdminEventLocation({ event, idx, updateEvent, formData, isDarkMode, inputClass }: any) {
+  const [geocoding, setGeocoding] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const shopHasLocation = !!(
+    (Array.isArray(formData.coordinates) && formData.coordinates.length === 2) ||
+    (formData.address && String(formData.address).trim())
+  );
+  const eventHasOwnCoords = Array.isArray(event.coordinates) && event.coordinates.length === 2;
+  const eventCanPin = eventHasOwnCoords || (Array.isArray(formData.coordinates) && formData.coordinates.length === 2);
+
+  const onBlur = async () => {
+    const address = (event.address || '').trim();
+    if (!address) return;
+    setGeocoding(true);
+    setMsg(null);
+    try {
+      const result = await geocodeAddress(address);
+      if (!result) {
+        setMsg("Couldn't locate this address on the map.");
+        return;
+      }
+      updateEvent(idx, {
+        coordinates: result.coordinates,
+        location: result.city || event.location || '',
+        country: result.country || event.country || '',
+      });
+      setMsg(`Location found: ${result.formattedAddress}`);
+    } catch (err) {
+      console.error('Failed to geocode event address', err);
+      setMsg('Geocoding failed. Try again later.');
+    } finally {
+      setGeocoding(false);
+    }
+  };
+
+  const useShopLocation = () => {
+    updateEvent(idx, {
+      address: formData.address || event.address || '',
+      coordinates: formData.coordinates || event.coordinates,
+      location: formData.location || event.location || '',
+      country: formData.country || event.country || '',
+    });
+    setMsg("Using the shop's location for this event.");
+  };
+
+  const muted = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <label className={`text-[10px] font-bold uppercase tracking-widest ${muted}`}>
+          Event location <span className="text-red-500">*</span>
+        </label>
+        {shopHasLocation && (
+          <button
+            type="button"
+            onClick={useShopLocation}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border-2 transition-colors ${
+              isDarkMode ? 'border-white/30 text-white hover:bg-white/10' : 'border-black/30 text-black hover:bg-black/5'
+            }`}
+          >
+            <MapPin className="w-3 h-3" /> Use shop location
+          </button>
+        )}
+      </div>
+      <div className="relative">
+        <input
+          type="text"
+          placeholder="e.g. Plaça de Catalunya, Barcelona, Spain"
+          value={event.address || ''}
+          onChange={(e) => updateEvent(idx, { address: e.target.value })}
+          onBlur={onBlur}
+          className={`pl-10 ${inputClass}`}
+        />
+        <MapPin className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${muted}`} />
+        {geocoding && (
+          <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase tracking-widest ${muted}`}>
+            Locating...
+          </span>
+        )}
+      </div>
+      {msg && <p className={`text-[10px] font-medium ${muted}`}>{msg}</p>}
+      {eventCanPin ? (
+        <p className={`text-[10px] ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`}>
+          Enter the exact venue so the event pins precisely on the map. City fills in automatically.
+        </p>
+      ) : (
+        <p className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
+          ⚠ A location is required to publish — type the venue address{shopHasLocation ? ' or tap "Use shop location"' : ''}.
+        </p>
+      )}
+      <input
+        type="text"
+        placeholder="City"
+        value={event.location || ''}
+        onChange={(e) => updateEvent(idx, { location: e.target.value })}
+        className={inputClass}
+      />
+    </div>
+  );
+}
+
 // Mirrors EditProfile so admin shop edit shows the same per-section
 // descriptions in the CATEGORIES tab.
 const SUBCATEGORY_DESCRIPTIONS: Record<string, string> = {
@@ -301,6 +406,10 @@ export function AdminCreatorEdit() {
 
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
+  // Auto-save (existing shops only — new shops still use the manual Create
+  // button since their doc id is derived from the name as you type).
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [loadedSnapshot, setLoadedSnapshot] = useState<string | null>(null);
   // Events tab: search + which row is expanded.
   const [eventsSearch, setEventsSearch] = useState("");
   const [expandedEventIdx, setExpandedEventIdx] = useState<number | null>(null);
@@ -399,8 +508,10 @@ export function AdminCreatorEdit() {
     const fetchData = async () => {
       try {
         const docSnap = await getDoc(doc(db, 'creators', id!));
+        let creatorObj: AdminFormData | null = null;
         if (docSnap.exists()) {
-          setFormData({ id: docSnap.id, ...docSnap.data() } as AdminFormData);
+          creatorObj = { id: docSnap.id, ...docSnap.data() } as AdminFormData;
+          setFormData(creatorObj);
         } else {
           alert('Creator not found');
           navigate('/admin/creators');
@@ -410,10 +521,14 @@ export function AdminCreatorEdit() {
         // shop ids equal to their user uid; legacy seeded shops use slugs
         // and won't have a matching doc.
         const userSnap = await getDoc(doc(db, 'users', id!));
+        let userObj: LinkedUser | null = null;
         if (userSnap.exists()) {
-          setUserData(userSnap.data() as LinkedUser);
+          userObj = userSnap.data() as LinkedUser;
+          setUserData(userObj);
         }
         setUserDataLoaded(true);
+        // Snapshot the loaded state so auto-save only fires on real edits.
+        setLoadedSnapshot(JSON.stringify({ formData: creatorObj, userData: userObj }));
       } catch (err) {
         console.error(err);
       } finally {
@@ -509,47 +624,56 @@ export function AdminCreatorEdit() {
   })();
   const adminCanPublish = adminPublishMissing.length === 0;
 
+  // Pure write to Firestore. No navigation — used by both the manual Create
+  // button (new shops) and the debounced auto-save (existing shops).
+  const persist = async () => {
+    const docId = isNew
+      ? formData.name?.toLowerCase().replace(/\s+/g, '-') || Date.now().toString()
+      : id!;
+    // No address → categorize as Worldwide and drop coordinates so it won't pin on the map.
+    const hasAddress = !!(formData.address || '').trim();
+    const location = hasAddress ? (formData.location || 'Worldwide') : 'Worldwide';
+    const country = hasAddress ? (formData.country || 'Worldwide') : 'Worldwide';
+    const isPublished = formData.isPublished !== false && adminCanPublish;
+    const { coordinates, ...rest } = formData;
+    const payload: any = {
+      ...rest,
+      id: docId,
+      location,
+      country,
+      isPublished,
+      website: normalizeUrl(formData.website),
+      socials: {
+        instagram: normalizeUrl(formData.socials?.instagram),
+        facebook: normalizeUrl(formData.socials?.facebook),
+        twitter: normalizeUrl(formData.socials?.twitter),
+      },
+    };
+    if (hasAddress && coordinates) payload.coordinates = coordinates;
+    await setDoc(doc(db, 'creators', docId), stripUndefined(payload));
+
+    // If a linked user account exists (USER sub-tab was populated), persist
+    // the personal info edits too. Email and role are read-only here.
+    if (userData) {
+      const userPayload: any = {
+        firstName: userData.firstName || '',
+        lastName: userData.lastName || '',
+        name: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
+        bio: userData.bio || '',
+        profileImage: userData.profileImage || '',
+      };
+      await setDoc(doc(db, 'users', docId), stripUndefined(userPayload), { merge: true });
+    }
+    // Sync the snapshot so isDirty resets after a successful write.
+    setLoadedSnapshot(JSON.stringify({ formData, userData }));
+  };
+
+  // Manual save — only used to create a brand-new shop (its doc id derives from
+  // the name, so we can't auto-save mid-typing). Navigates back on success.
   const handleSave = async () => {
     setSaving(true);
     try {
-      const docId = isNew
-        ? formData.name?.toLowerCase().replace(/\s+/g, '-') || Date.now().toString()
-        : id!;
-      // No address → categorize as Worldwide and drop coordinates so it won't pin on the map.
-      const hasAddress = !!(formData.address || '').trim();
-      const location = hasAddress ? (formData.location || 'Worldwide') : 'Worldwide';
-      const country = hasAddress ? (formData.country || 'Worldwide') : 'Worldwide';
-      const isPublished = formData.isPublished !== false && adminCanPublish;
-      const { coordinates, ...rest } = formData;
-      const payload: any = {
-        ...rest,
-        id: docId,
-        location,
-        country,
-        isPublished,
-        website: normalizeUrl(formData.website),
-        socials: {
-          instagram: normalizeUrl(formData.socials?.instagram),
-          facebook: normalizeUrl(formData.socials?.facebook),
-          twitter: normalizeUrl(formData.socials?.twitter),
-        },
-      };
-      if (hasAddress && coordinates) payload.coordinates = coordinates;
-      await setDoc(doc(db, 'creators', docId), stripUndefined(payload));
-
-      // If a linked user account exists (USER sub-tab was populated), persist
-      // the personal info edits too. Email and role are read-only here.
-      if (userData) {
-        const userPayload: any = {
-          firstName: userData.firstName || '',
-          lastName: userData.lastName || '',
-          name: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
-          bio: userData.bio || '',
-          profileImage: userData.profileImage || '',
-        };
-        await setDoc(doc(db, 'users', docId), stripUndefined(userPayload), { merge: true });
-      }
-
+      await persist();
       navigate('/admin/creators');
     } catch (err) {
       console.error(err);
@@ -558,6 +682,48 @@ export function AdminCreatorEdit() {
       setSaving(false);
     }
   };
+
+  // Has anything changed since load / last save?
+  const isDirty = loadedSnapshot !== null && JSON.stringify({ formData, userData }) !== loadedSnapshot;
+
+  // ── Auto-save (existing shops only) ── persist ~1s after the last edit.
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savingRef = useRef(false);
+  useEffect(() => {
+    if (isNew || loadedSnapshot === null || !isDirty || savingRef.current) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(async () => {
+      savingRef.current = true;
+      setSaveStatus('saving');
+      try {
+        await persist();
+        setSaveStatus('saved');
+      } catch (err) {
+        console.error('Auto-save failed', err);
+        setSaveStatus('error');
+      } finally {
+        savingRef.current = false;
+      }
+    }, 1000);
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
+    // persist is recreated each render; it reads the latest formData via closure.
+  }, [formData, userData, isDirty, isNew, loadedSnapshot]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Flush a pending save on unmount (navigating away before the debounce fires).
+  const persistRef = useRef(persist);
+  persistRef.current = persist;
+  const isDirtyRef = useRef(isDirty);
+  isDirtyRef.current = isDirty;
+  useEffect(() => {
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+      if (!isNew && isDirtyRef.current && !savingRef.current) {
+        persistRef.current().catch((e) => console.error('Flush save failed', e));
+      }
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <div className="p-8">Loading...</div>;
 
@@ -581,6 +747,22 @@ export function AdminCreatorEdit() {
           </h1>
         </div>
         <div className="flex items-center gap-3 md:gap-4">
+          {/* Auto-save status (existing shops). Sits left of Publish so it's
+              always visible at the top while editing. */}
+          {!isNew && (
+            <div className="flex items-center gap-1.5 min-w-0">
+              {saveStatus === 'saving' || (isDirty && saveStatus !== 'error') ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                  <span className={`hidden sm:inline text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Saving…</span>
+                </>
+              ) : saveStatus === 'error' ? (
+                <span className="text-[10px] font-bold uppercase tracking-widest text-red-500" title="Auto-save failed — will retry on next edit">Save failed</span>
+              ) : saveStatus === 'saved' ? (
+                <span className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>✓ Saved</span>
+              ) : null}
+            </div>
+          )}
           <button
             type="button"
             disabled={formData.isPublished === false && !adminCanPublish}
@@ -600,14 +782,18 @@ export function AdminCreatorEdit() {
           >
             {formData.isPublished !== false ? 'Unpublish' : 'Publish'}
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 px-4 md:px-6 py-2 md:py-3 bg-red-500 text-white font-bold uppercase tracking-widest text-sm hover:bg-red-600 transition-colors disabled:opacity-50"
-          >
-            <Save className="w-4 h-4" />
-            {saving ? 'Saving...' : 'Save'}
-          </button>
+          {/* New shops still need an explicit Create — the doc id is derived
+              from the name, so we can't auto-save mid-typing. */}
+          {isNew && (
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 md:px-6 py-2 md:py-3 bg-red-500 text-white font-bold uppercase tracking-widest text-sm hover:bg-red-600 transition-colors disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? 'Creating…' : 'Create shop'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -1171,6 +1357,11 @@ export function AdminCreatorEdit() {
                 <div className={`border-2 ${isDarkMode ? 'border-zinc-700' : 'border-gray-300'}`}>
                   {filtered.map(({ e: event, idx }: { e: any; idx: number }) => {
                     const expanded = expandedEventIdx === idx;
+                    // An event needs resolvable coordinates to publish: its own
+                    // geocoded ones, or the shop's as a fallback.
+                    const eventCanPin =
+                      (Array.isArray(event.coordinates) && event.coordinates.length === 2) ||
+                      (Array.isArray(formData.coordinates) && formData.coordinates.length === 2);
                     return (
                       <div key={idx} className={`border-b-2 last:border-b-0 ${isDarkMode ? 'border-zinc-800' : 'border-gray-200'}`}>
                         <div
@@ -1218,6 +1409,16 @@ export function AdminCreatorEdit() {
                             <div className="flex items-center gap-2">
                               <button
                                 type="button"
+                                // Always allow unpublishing. Only allow publishing
+                                // once the event has a resolvable location.
+                                disabled={!event.isPublished && !eventCanPin}
+                                title={
+                                  event.isPublished
+                                    ? 'Click to unpublish'
+                                    : eventCanPin
+                                    ? 'Click to publish this event'
+                                    : 'Add an event location first — a published event needs a place to pin on the map.'
+                                }
                                 onClick={() => {
                                   // Source is set explicitly via the selector below,
                                   // so this just toggles isPublished. Default the
@@ -1229,7 +1430,7 @@ export function AdminCreatorEdit() {
                                   }
                                   updateEvent(idx, next);
                                 }}
-                                className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest border-2 ${
+                                className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest border-2 disabled:opacity-50 disabled:cursor-not-allowed ${
                                   event.isPublished ? 'bg-red-500 text-white border-red-500' : 'bg-green-500 text-white border-green-500'
                                 }`}
                               >
@@ -1414,7 +1615,14 @@ export function AdminCreatorEdit() {
                                 </div>
                               );
                             })()}
-                            <input type="text" placeholder="City" value={event.location || ''} onChange={(e) => updateEvent(idx, { location: e.target.value })} className={inputClass} />
+                            <AdminEventLocation
+                              event={event}
+                              idx={idx}
+                              updateEvent={updateEvent}
+                              formData={formData}
+                              isDarkMode={isDarkMode}
+                              inputClass={inputClass}
+                            />
                             <textarea rows={3} placeholder="Description" value={event.description || ''} onChange={(e) => updateEvent(idx, { description: e.target.value })} className={inputClass} />
                             <ImageField
                               label="Event Cover Image"
@@ -1423,6 +1631,17 @@ export function AdminCreatorEdit() {
                               folder={`creators/${id || 'new'}/events/${idx}`}
                               isDarkMode={isDarkMode}
                             />
+                            <div>
+                              <label className={`block text-[10px] font-bold uppercase tracking-widest mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                Event Gallery
+                              </label>
+                              <GalleryField
+                                items={event.gallery || []}
+                                onChange={(items) => updateEvent(idx, { gallery: items })}
+                                folder={`creators/${id || 'new'}/events/${idx}/gallery`}
+                                isDarkMode={isDarkMode}
+                              />
+                            </div>
                           </div>
                         )}
                       </div>

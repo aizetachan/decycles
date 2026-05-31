@@ -9,6 +9,7 @@ const fs = require("fs");
 const path = require("path");
 const functions = require("firebase-functions/v1");
 const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions/v2");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
@@ -51,6 +52,78 @@ exports.syncAdminClaim = onDocumentWritten(
     }
   },
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin user management — operations that need the Admin SDK and therefore
+// can't run from the client: changing another user's real login email, and
+// fully deleting a user (Firestore docs + Auth account).
+//
+// Both are callable functions guarded by the `admin` custom claim (kept in
+// sync by syncAdminClaim above). Non-admins get permission-denied.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const assertAdmin = (request) => {
+  if (request.auth?.token?.admin !== true) {
+    throw new HttpsError("permission-denied", "Admins only.");
+  }
+};
+
+// Change a user's real authentication email (the one they log in with) and
+// mirror it onto their users/{uid} doc.
+exports.adminUpdateUserEmail = onCall({ region: "us-central1" }, async (request) => {
+  assertAdmin(request);
+  const uid = String(request.data?.uid || "").trim();
+  const email = String(request.data?.email || "").trim();
+  if (!uid || !email) {
+    throw new HttpsError("invalid-argument", "uid and email are required.");
+  }
+  try {
+    await getAuth().updateUser(uid, { email });
+    await getFirestore().doc(`users/${uid}`).set({ email }, { merge: true });
+    return { ok: true };
+  } catch (err) {
+    logger.error(`[adminUpdateUserEmail] failed for ${uid}:`, err);
+    // Surface common Auth errors as friendly messages to the admin UI.
+    if (err?.code === "auth/email-already-exists") {
+      throw new HttpsError("already-exists", "That email is already in use by another account.");
+    }
+    if (err?.code === "auth/invalid-email") {
+      throw new HttpsError("invalid-argument", "That email address is invalid.");
+    }
+    if (err?.code === "auth/user-not-found") {
+      throw new HttpsError("not-found", "No auth account exists for this user.");
+    }
+    throw new HttpsError("internal", err?.message || "Failed to update email.");
+  }
+});
+
+// Fully delete a user: their Firestore docs (users + creators) and their Auth
+// account. Admins can't delete their own account (avoids self-lockout).
+exports.adminDeleteUser = onCall({ region: "us-central1" }, async (request) => {
+  assertAdmin(request);
+  const uid = String(request.data?.uid || "").trim();
+  if (!uid) throw new HttpsError("invalid-argument", "uid is required.");
+  if (uid === request.auth.uid) {
+    throw new HttpsError("failed-precondition", "You can't delete your own account.");
+  }
+  try {
+    const db = getFirestore();
+    // Firestore docs first, so even if the Auth deletion is a no-op (account
+    // already gone) the profile is removed.
+    await db.doc(`users/${uid}`).delete().catch(() => {});
+    await db.doc(`creators/${uid}`).delete().catch(() => {});
+    await getAuth()
+      .deleteUser(uid)
+      .catch((e) => {
+        // An already-missing Auth account is fine — the docs are gone.
+        if (e?.code !== "auth/user-not-found") throw e;
+      });
+    return { ok: true };
+  } catch (err) {
+    logger.error(`[adminDeleteUser] failed for ${uid}:`, err);
+    throw new HttpsError("internal", err?.message || "Failed to delete user.");
+  }
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SSR for shared event links: returns the React shell with the event's title,

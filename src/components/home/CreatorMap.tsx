@@ -15,6 +15,11 @@ import { EVENT_CATEGORY_COLORS } from "../../constants/categories";
 interface CreatorMapProps {
   isDarkMode: boolean;
   filteredCreators: Creator[];
+  // Source for the event-marker layer. Unlike `filteredCreators` (published
+  // shops only, used for shop pins), this includes shopless user docs that have
+  // published events, so their events still pin on the map. Falls back to
+  // `filteredCreators` when not provided.
+  eventCreators?: Creator[];
 }
 
 // Custom marker for events — small coloured dot with the category color. We
@@ -28,22 +33,27 @@ const eventIcon = (color: string) =>
     iconAnchor: [7, 7],
   });
 
-export function CreatorMap({ isDarkMode, filteredCreators }: CreatorMapProps) {
+export function CreatorMap({ isDarkMode, filteredCreators, eventCreators }: CreatorMapProps) {
   const { openCreatorProfile, openEvent } = useUI();
-  // Events on the map are opt-in for now — toggle hidden until the data has
-  // dedicated geocoded coordinates per event. Today the marker falls back to
-  // the parent shop's coordinates, so a single shop's events all cluster on
-  // the same point.
-  const [showEvents, setShowEvents] = useState(false);
+  // Events now carry their own geocoded coordinates (set from the event's own
+  // address in the editor), so they pin at their real venue. Shown by default;
+  // the toggle still lets visitors hide the event layer. Events without their
+  // own coordinates fall back to the parent shop's pin.
+  const [showEvents, setShowEvents] = useState(true);
 
-  // Flatten the nested events from all filtered creators into a single list
-  // with a resolved coordinate (event coords > shop coords).
+  // Flatten the nested events into a single marker list with a resolved
+  // coordinate (event coords > shop coords). Uses `eventCreators` so events
+  // from shopless users still appear. Mirrors the calendar's publish logic:
+  // "user"-published events bypass the shop's publish state; "shop" (default)
+  // events require the shop to be published.
+  const eventSource = eventCreators ?? filteredCreators;
   const eventMarkers = useMemo(() => {
     const list: any[] = [];
-    filteredCreators.forEach((c: any) => {
+    eventSource.forEach((c: any) => {
       const events = Array.isArray(c.events) ? c.events : [];
       events.forEach((e: any, idx: number) => {
         if (!e || !e.isPublished) return;
+        if (e.publishedFrom !== "user" && c.isPublished === false) return;
         const coords = e.coordinates || c.coordinates;
         if (!coords) return;
         list.push({
@@ -56,7 +66,7 @@ export function CreatorMap({ isDarkMode, filteredCreators }: CreatorMapProps) {
       });
     });
     return list;
-  }, [filteredCreators]);
+  }, [eventSource]);
 
   return (
     <div className={`relative h-[600px] w-full brutalist-border brutalist-shadow ${isDarkMode ? "bg-black" : "bg-white"}`}>
@@ -128,7 +138,9 @@ export function CreatorMap({ isDarkMode, filteredCreators }: CreatorMapProps) {
                   </span>
                 </div>
                 <h3 className="font-display uppercase tracking-wider text-lg m-0">{m.event.title || "Untitled event"}</h3>
-                {m.event.location && <p className="text-xs text-gray-500 m-0">{m.event.location}</p>}
+                {(m.event.address || m.event.location) && (
+                  <p className="text-xs text-gray-500 m-0">{m.event.address || m.event.location}</p>
+                )}
                 <button
                   onClick={() => openEvent({
                     id: m.creator.id,
@@ -138,6 +150,7 @@ export function CreatorMap({ isDarkMode, filteredCreators }: CreatorMapProps) {
                     coverImage: m.event.coverImage || m.creator.coverImage,
                     subCategories: m.event.category ? [m.event.category] : [],
                     location: m.event.location,
+                    address: m.event.address || "",
                     eventDate: m.event.startDate,
                     endDate: m.event.endDate,
                     startTime: m.event.startTime,

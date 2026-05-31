@@ -201,9 +201,12 @@ export function EventPage() {
                     {dateLabel}{timeLabel ? ` · ${timeLabel}` : ""}
                   </span>
                 )}
-                {event.location && (
+                {(event.address || event.location) && (
                   <span className="inline-flex items-center gap-2">
-                    <MapPin className="w-4 h-4 opacity-70" /> {event.location}
+                    <MapPin className="w-4 h-4 opacity-70" />
+                    {event.location && event.address
+                      ? `${event.location} · ${event.address}`
+                      : event.address || event.location}
                   </span>
                 )}
                 {category && (

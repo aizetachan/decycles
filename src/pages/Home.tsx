@@ -423,6 +423,25 @@ export function Home() {
     );
   });
 
+  // Source for the map's event-marker layer. Unlike `filteredCreators` (only
+  // published shops), this includes shopless user docs that have published
+  // events, so a published event pins on the map even without a shop. Same
+  // publish logic as the calendar: "user"-published events bypass shop publish;
+  // "shop" events need the shop published. No country filter here — the map is
+  // geographic and user docs are stored as "Worldwide", so filtering by the
+  // doc's country would wrongly hide their events. The point is that any
+  // published event with coordinates always pins.
+  const eventMapCreators = useMemo(() => {
+    return (creators as any[]).filter((c) => {
+      const events = Array.isArray(c.events) ? c.events : [];
+      return events.some((e: any) => {
+        if (!e || !e.isPublished) return false;
+        if (e.publishedFrom === "user") return true;
+        return c.isPublished !== false;
+      });
+    }) as Creator[];
+  }, [creators]);
+
   const galleryImagesList = useMemo(() => {
     return creators
       .filter(c => c.isPublished !== false)
@@ -492,6 +511,7 @@ export function Home() {
             categories: ["Events"],
             subCategories: e.category ? [e.category] : [],
             location: e.location || c.location,
+            address: e.address || "",
             country: c.country,
             eventDate: e.startDate,
             endDate: e.endDate,
@@ -669,6 +689,7 @@ export function Home() {
                 <CreatorMap
                   isDarkMode={isDarkMode}
                   filteredCreators={filteredCreators}
+                  eventCreators={eventMapCreators}
                 />
               )}
 

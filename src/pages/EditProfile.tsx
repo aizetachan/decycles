@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { useNavigate, useBlocker } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { X, Plus, MapPin, Loader2, ChevronDown, ChevronUp, Search, Calendar as CalIcon } from "lucide-react";
 import { DatePicker } from "../components/ui/DatePicker";
 import { motion, AnimatePresence } from "motion/react";
@@ -14,7 +14,7 @@ import { PasswordSetupForm } from "../components/auth/PasswordSetupForm";
 import { CoverPreviewModal } from "../components/modals/CoverPreviewModal";
 import { Category, SubCategory, Creator } from "../types";
 import { db } from "../firebase";
-import { uploadImage, stripUndefined, normalizeUrl } from "../lib/upload";
+import { uploadImage, stripUndefined, normalizeUrl, isEphemeralUrl } from "../lib/upload";
 import { CREATOR_DEFAULT_AVATAR, CREATOR_DEFAULT_COVER, randomUserAvatar } from "../lib/defaultAvatars";
 import { geocodeAddress } from "../lib/geocode";
 import { EVENT_CATEGORIES } from "../constants/categories";
@@ -241,6 +241,43 @@ export function EventEditorItem({
     !!(event.endDate && event.startDate && event.endDate !== event.startDate),
   );
   const [coverProgress, setCoverProgress] = useState<number | null>(null);
+  // Aggregate gallery upload progress (0..100) for the batch in flight; null = idle.
+  const [galleryProgress, setGalleryProgress] = useState<number | null>(null);
+  // Address geocoding state — mirrors the shop address field so an event can be
+  // pinned at its own specific location, independent of the shop's address.
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeMessage, setGeocodeMessage] = useState<string | null>(null);
+
+  // Geocode the event's own address on blur and store coordinates on the event.
+  // City/country auto-fill from the lookup so the event shows a readable place
+  // and pins correctly on the map (CreatorMap reads `event.coordinates`).
+  const onAddressBlur = async () => {
+    const address = (event.address || "").trim();
+    if (!address) return;
+    setGeocoding(true);
+    setGeocodeMessage(null);
+    try {
+      const result = await geocodeAddress(address);
+      if (!result) {
+        setGeocodeMessage("Couldn't locate this address on the map.");
+        return;
+      }
+      const newEvents = [...profileData.events];
+      newEvents[idx] = {
+        ...newEvents[idx],
+        coordinates: result.coordinates,
+        location: result.city || newEvents[idx].location || "",
+        country: result.country || newEvents[idx].country || "",
+      };
+      setProfileData({ ...profileData, events: newEvents });
+      setGeocodeMessage(`Location found: ${result.formattedAddress}`);
+    } catch (err) {
+      console.error("Failed to geocode event address", err);
+      setGeocodeMessage("Geocoding failed. Try again later.");
+    } finally {
+      setGeocoding(false);
+    }
+  };
 
   const onCoverDrop = async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0 || !uid) return;
@@ -271,18 +308,62 @@ export function EventEditorItem({
     }
   };
 
-  const onGalleryDrop = (acceptedFiles: File[]) => {
-    const newItems = acceptedFiles.map((file) => ({
-      url: URL.createObjectURL(file),
-      description: "",
-    }));
-    const newEvents = [...profileData.events];
-    const currentGallery = newEvents[idx].gallery || [];
-    newEvents[idx] = {
-      ...newEvents[idx],
-      gallery: [...currentGallery, ...newItems].slice(0, 5),
+  const onGalleryDrop = async (acceptedFiles: File[]) => {
+    if (acceptedFiles.length === 0 || !uid) return;
+    // Respect the 5-image cap — only take as many as there's room for.
+    const room = Math.max(0, 5 - (profileData.events[idx].gallery || []).length);
+    const files = acceptedFiles.slice(0, room);
+    if (files.length === 0) return;
+
+    // Optimistic blob previews so the user sees the images immediately while
+    // they upload. Each gets a stable key so we can swap it for the real URL.
+    const previews = files.map((file) => ({ blob: URL.createObjectURL(file), file }));
+    const startEvents = [...profileData.events];
+    const baseGallery = startEvents[idx].gallery || [];
+    startEvents[idx] = {
+      ...startEvents[idx],
+      gallery: [...baseGallery, ...previews.map((p) => ({ url: p.blob, description: "" }))].slice(0, 5),
     };
-    setProfileData({ ...profileData, events: newEvents });
+    setProfileData({ ...profileData, events: startEvents });
+    setGalleryProgress(0);
+
+    const perFile: number[] = files.map(() => 0);
+    try {
+      const urls = await Promise.all(
+        previews.map((p, i) =>
+          uploadImage(p.file, `creators/${uid}/events/${idx}/gallery`, (pct) => {
+            perFile[i] = pct;
+            setGalleryProgress(perFile.reduce((a, b) => a + b, 0) / perFile.length);
+          }),
+        ),
+      );
+      // Swap each optimistic blob URL for its uploaded download URL.
+      setProfileData((prev: any) => {
+        const evs = [...prev.events];
+        const gallery = (evs[idx].gallery || []).map((img: any) => {
+          const match = previews.findIndex((p) => p.blob === (typeof img === "string" ? img : img.url));
+          if (match === -1) return img;
+          return { url: urls[match], description: typeof img === "string" ? "" : img.description || "" };
+        });
+        evs[idx] = { ...evs[idx], gallery };
+        return { ...prev, events: evs };
+      });
+    } catch (err) {
+      console.error("Failed to upload event gallery images", err);
+      alert("Failed to upload one or more gallery images. Please try again.");
+      // Drop the failed optimistic previews so we never persist blob: URLs.
+      setProfileData((prev: any) => {
+        const evs = [...prev.events];
+        const gallery = (evs[idx].gallery || []).filter(
+          (img: any) => !previews.some((p) => p.blob === (typeof img === "string" ? img : img.url)),
+        );
+        evs[idx] = { ...evs[idx], gallery };
+        return { ...prev, events: evs };
+      });
+    } finally {
+      setGalleryProgress(null);
+      previews.forEach((p) => URL.revokeObjectURL(p.blob));
+    }
   };
 
   const {
@@ -297,6 +378,31 @@ export function EventEditorItem({
     isDragActive: isGalleryDragActive,
   } = useDropzone({ onDrop: onGalleryDrop, accept: { "image/*": [] }, maxFiles: 5 } as any);
 
+  // An event needs a resolvable location to pin on the map: its own geocoded
+  // coordinates, or — for shop owners — the shop's coordinates as a fallback.
+  // Users without a shop must always give the event its own address.
+  const shopHasLocation = !!(
+    (profileData.coordinates && profileData.coordinates.length === 2) ||
+    (profileData.address && String(profileData.address).trim())
+  );
+  const eventHasOwnCoords = Array.isArray(event.coordinates) && event.coordinates.length === 2;
+  const eventCanPin = eventHasOwnCoords || !!(profileData.coordinates && profileData.coordinates.length === 2);
+
+  // Copy the shop's address + coordinates onto the event, so a shop owner can
+  // one-click reuse their shop location instead of re-typing the address.
+  const useShopLocation = () => {
+    const newEvents = [...profileData.events];
+    newEvents[idx] = {
+      ...newEvents[idx],
+      address: profileData.address || newEvents[idx].address || "",
+      coordinates: profileData.coordinates || newEvents[idx].coordinates,
+      location: profileData.location || newEvents[idx].location || "",
+      country: profileData.country || newEvents[idx].country || "",
+    };
+    setProfileData({ ...profileData, events: newEvents });
+    setGeocodeMessage("Using your shop's location for this event.");
+  };
+
   return (
     <div className={`p-6 border-2 ${isDarkMode ? "border-white/20 bg-white/5" : "border-black/20 bg-black/5"}`}>
       <div className="flex justify-between items-start mb-6">
@@ -306,6 +412,16 @@ export function EventEditorItem({
         <div className="flex items-center gap-4">
           <button
             type="button"
+            // Always allow unpublishing. Only allow publishing once the event
+            // has a resolvable location, so a published event always pins.
+            disabled={!event.isPublished && !eventCanPin}
+            title={
+              event.isPublished
+                ? "Click to unpublish"
+                : eventCanPin
+                ? "Click to publish this event"
+                : "Add an event location first — a published event needs a place to pin on the map."
+            }
             onClick={() => {
               // The publish source is set explicitly by the "Publish from"
               // selector below, so the toggle here just flips isPublished.
@@ -319,7 +435,7 @@ export function EventEditorItem({
               newEvents[idx] = next;
               setProfileData({ ...profileData, events: newEvents });
             }}
-            className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest border-2 transition-colors ${
+            className={`px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest border-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
               event.isPublished
                 ? "bg-red-500 text-white border-red-500 hover:bg-red-600 hover:border-red-600"
                 : "bg-green-500 text-white border-green-500 hover:bg-green-600 hover:border-green-600"
@@ -565,6 +681,70 @@ export function EventEditorItem({
           );
         })()}
 
+        {/* Event location — its own address, independent of the shop's. When
+            geocoded it gives the event dedicated coordinates so it pins at the
+            exact venue on the map instead of falling back to the shop's pin.
+            A location is required to publish: shop owners can one-click reuse
+            their shop's location, but it can always be refined to the exact venue. */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <label className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+              Event location <span className="text-red-500">*</span>
+            </label>
+            {shopHasLocation && (
+              <button
+                type="button"
+                onClick={useShopLocation}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border-2 transition-colors ${
+                  isDarkMode
+                    ? "border-white/30 text-white hover:bg-white/10"
+                    : "border-black/30 text-black hover:bg-black/5"
+                }`}
+              >
+                <MapPin className="w-3 h-3" /> Use shop location
+              </button>
+            )}
+          </div>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="e.g. Plaça de Catalunya, Barcelona, Spain"
+              value={event.address || ""}
+              onChange={(e) => {
+                const newEvents = [...profileData.events];
+                newEvents[idx] = { ...newEvents[idx], address: e.target.value };
+                setProfileData({ ...profileData, events: newEvents });
+              }}
+              onBlur={onAddressBlur}
+              className={`w-full pl-10 p-3 text-sm border-2 bg-transparent focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                isDarkMode
+                  ? "border-white/20 text-white focus:ring-white focus:ring-offset-black placeholder-gray-600"
+                  : "border-black/20 text-black focus:ring-black focus:ring-offset-white placeholder-gray-400"
+              }`}
+            />
+            <MapPin className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
+            {geocoding && (
+              <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                Locating...
+              </span>
+            )}
+          </div>
+          {geocodeMessage && (
+            <p className={`text-[10px] font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+              {geocodeMessage}
+            </p>
+          )}
+          {eventCanPin ? (
+            <p className={`text-[10px] ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
+              Enter the exact venue so the event pins precisely on the map. City fills in automatically.
+            </p>
+          ) : (
+            <p className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-yellow-400" : "text-yellow-600"}`}>
+              ⚠ A location is required to publish — type the venue address{shopHasLocation ? ` or tap "Use shop location"` : ""}.
+            </p>
+          )}
+        </div>
+
         <input
           type="text"
           list="cities-list"
@@ -662,7 +842,7 @@ export function EventEditorItem({
             {(!event.gallery || event.gallery.length < 5) && (
               <div
                 {...getGalleryRootProps()}
-                className={`w-full p-6 border-2 border-dashed text-center cursor-pointer transition-colors ${
+                className={`relative w-full p-6 border-2 border-dashed text-center cursor-pointer transition-colors ${
                   isGalleryDragActive
                     ? "border-black bg-black/5"
                     : isDarkMode
@@ -674,6 +854,7 @@ export function EventEditorItem({
                 <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
                   Drag & drop images here, or click to select
                 </span>
+                {galleryProgress !== null && <UploadProgressOverlay percent={galleryProgress} />}
               </div>
             )}
           </div>
@@ -783,6 +964,19 @@ function canPublishShop(p: ProfileData): boolean {
   return shopPublishMissing(p).length === 0;
 }
 
+// True while any image in the profile/events is still an optimistic blob:/data:
+// preview (an upload is mid-flight). Auto-save defers until these resolve to
+// real download URLs so we never persist a URL that dies on reload.
+function hasEphemeralImages(p: any): boolean {
+  const urls: (string | undefined)[] = [p.profileImage, p.shopProfileImage, p.coverImage];
+  (p.gallery || []).forEach((g: any) => urls.push(typeof g === "string" ? g : g?.url));
+  (p.events || []).forEach((e: any) => {
+    urls.push(e?.coverImage);
+    (e?.gallery || []).forEach((g: any) => urls.push(typeof g === "string" ? g : g?.url));
+  });
+  return urls.some((u) => isEphemeralUrl(u));
+}
+
 // Short, mobile-friendly description shown under each subcategory section
 // title to help the creator pick the right bucket for their shop.
 const SUBCATEGORY_DESCRIPTIONS: Record<string, string> = {
@@ -810,7 +1004,10 @@ export function EditProfile() {
   // Default to MY WORK — that's the shop content shown publicly, so it's the
   // most common reason a creator opens this page.
   const [activeProfileSubTab, setActiveProfileSubTab] = useState<ProfileSubTab>("MY WORK");
-  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  // Auto-save status shown in the footer. "idle" before the first edit,
+  // "saving" while a debounced write is in flight, "saved" once persisted,
+  // "error" if the write failed (it retries on the next edit).
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [geocoding, setGeocoding] = useState(false);
@@ -865,7 +1062,6 @@ export function EditProfile() {
   // Snapshot of the data as it exists in Firestore. Used to compute isDirty.
   // null while still loading.
   const [loadedSnapshot, setLoadedSnapshot] = useState<string | null>(null);
-  const [savingFromBlocker, setSavingFromBlocker] = useState(false);
 
   // Tap-to-reveal tooltip for disabled tabs (mobile has no hover).
   // EVENTS is now enabled. The home calendar feature remains gated separately.
@@ -929,13 +1125,19 @@ export function EditProfile() {
         if (cancelled) return;
         if (!snap.exists()) {
           // No creator doc yet. Pre-fill default shop visuals only for
-          // creator/admin so their SHOP tab isn't visually blank.
+          // creator/admin so their SHOP tab isn't visually blank. Sync the
+          // snapshot to these defaults so auto-save doesn't fire a phantom
+          // write just from opening the editor.
           if (isCreator) {
-            setProfileData((prev) => ({
-              ...prev,
-              shopProfileImage: prev.shopProfileImage || CREATOR_DEFAULT_AVATAR,
-              coverImage: prev.coverImage || CREATOR_DEFAULT_COVER,
-            }));
+            setProfileData((prev) => {
+              const next = {
+                ...prev,
+                shopProfileImage: prev.shopProfileImage || CREATOR_DEFAULT_AVATAR,
+                coverImage: prev.coverImage || CREATOR_DEFAULT_COVER,
+              };
+              setLoadedSnapshot(JSON.stringify(next));
+              return next;
+            });
           }
           return;
         }
@@ -996,12 +1198,8 @@ export function EditProfile() {
     [profileData, loadedSnapshot]
   );
 
-  // Block in-app navigation while there are unsaved changes.
-  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
-    isDirty && currentLocation.pathname !== nextLocation.pathname
-  );
-
-  // Native browser warning on tab close / refresh while dirty.
+  // Native browser warning on tab close / refresh while a save is still pending,
+  // so an auto-save that hasn't flushed yet isn't lost on a hard reload.
   useEffect(() => {
     if (!isDirty) return;
     const handler = (e: BeforeUnloadEvent) => {
@@ -1011,6 +1209,62 @@ export function EditProfile() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty]);
+
+  // ── Auto-save ──────────────────────────────────────────────────────────
+  // Persist any change ~1s after the user stops editing, so there's no manual
+  // Save button. Publishing stays a deliberate action via its own toggle.
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savingRef = useRef(false);
+  useEffect(() => {
+    // Don't run until the initial Firestore hydrate has set a snapshot.
+    if (loadedSnapshot === null || !currentUser) return;
+    if (!isDirty || savingRef.current) return;
+    // Defer while an image upload is mid-flight (blob: previews present). The
+    // URL swap that completes the upload re-triggers this effect.
+    if (hasEphemeralImages(profileData)) {
+      setSaveStatus("saving");
+      return;
+    }
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(async () => {
+      savingRef.current = true;
+      setSaveError(null);
+      setSaveStatus("saving");
+      try {
+        await saveProfile();
+        setSaveStatus("saved");
+      } catch (err: any) {
+        console.error("Auto-save failed", err);
+        setSaveError(err?.message || "Auto-save failed");
+        setSaveStatus("error");
+      } finally {
+        savingRef.current = false;
+      }
+    }, 1000);
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
+    // saveProfile is intentionally omitted — it's recreated every render and
+    // reads the latest profileData via closure when the timer fires.
+  }, [profileData, isDirty, currentUser, loadedSnapshot]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Flush a pending save when leaving the page (in-app navigation unmounts the
+  // component before the debounce fires). Refs keep the flush reading fresh data.
+  const saveProfileRef = useRef<() => Promise<void>>();
+  const isDirtyRef = useRef(isDirty);
+  isDirtyRef.current = isDirty;
+  const ephemeralRef = useRef(false);
+  ephemeralRef.current = hasEphemeralImages(profileData);
+  useEffect(() => {
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+      // Skip flush while an upload is in flight — the blob: URL isn't persisted
+      // anyway, so writing it would only create a dead image reference.
+      if (isDirtyRef.current && !savingRef.current && !ephemeralRef.current && saveProfileRef.current) {
+        saveProfileRef.current().catch((e) => console.error("Flush save failed", e));
+      }
+    };
+  }, []);
 
   const userFolder = currentUser ? `users/${currentUser.uid}` : null;
   const shopFolder = currentUser ? `creators/${currentUser.uid}` : null;
@@ -1201,8 +1455,10 @@ export function EditProfile() {
       // Plain users (role = "user") can also publish events from their user
       // profile. Persist them on a minimal `creators/{uid}` doc so the
       // calendar (which reads from the creators collection) can pick them up.
-      // The doc is kept unpublished and categoryless so this user never
-      // surfaces as a shop in the directory grid.
+      // The doc is kept unpublished so this user never surfaces as a shop in
+      // the directory grid, but it's auto-tagged with the "Events" category so
+      // it's categorized correctly (and can surface under the Events filter in
+      // the explorer if that's enabled later).
       const userOnlyDoc: any = {
         id: currentUser.uid,
         name: fullName || profileData.email || "User",
@@ -1212,7 +1468,7 @@ export function EditProfile() {
         creatorImage: profileData.profileImage || "",
         // Hard-pin these so the doc is never treated as a public shop.
         isPublished: false,
-        categories: [],
+        categories: ["Events"],
         subCategories: [],
         gallery: [],
         country: "Worldwide",
@@ -1226,63 +1482,8 @@ export function EditProfile() {
     // Sync snapshot — the form is now in sync with Firestore.
     setLoadedSnapshot(JSON.stringify(profileData));
   };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaveError(null);
-    if (!currentUser) {
-      setSaveError("You must be logged in to save your profile.");
-      return;
-    }
-    try {
-      await saveProfile();
-      setShowSaveSuccess(true);
-
-      // After save, always send back to home regardless of role/sub-tab.
-      // The page re-opens cleanly next time and the data is persisted.
-      setTimeout(() => {
-        setShowSaveSuccess(false);
-        navigate("/");
-      }, 900);
-    } catch (err: any) {
-      console.error("Failed to save profile", err);
-      setSaveError(err?.message || "Failed to save profile");
-    }
-  };
-
-  // Blocker modal handlers
-  const handleBlockerSaveAndContinue = async () => {
-    if (!blocker || blocker.state !== "blocked") return;
-    setSaveError(null);
-    setSavingFromBlocker(true);
-    try {
-      await saveProfile();
-      blocker.proceed?.();
-    } catch (err: any) {
-      console.error("Failed to save profile", err);
-      setSaveError(err?.message || "Failed to save profile");
-    } finally {
-      setSavingFromBlocker(false);
-    }
-  };
-
-  const handleBlockerDiscard = () => {
-    if (!blocker || blocker.state !== "blocked") return;
-    // Reset local state to whatever was last loaded — so isDirty becomes false.
-    if (loadedSnapshot) {
-      try {
-        setProfileData(JSON.parse(loadedSnapshot));
-      } catch {
-        /* noop */
-      }
-    }
-    blocker.proceed?.();
-  };
-
-  const handleBlockerCancel = () => {
-    if (!blocker || blocker.state !== "blocked") return;
-    blocker.reset?.();
-  };
+  // Keep the unmount-flush ref pointed at the latest closure.
+  saveProfileRef.current = saveProfile;
 
   // Tab list depends on the role.
   // Events were moved out to /my-events. The profile editor keeps the static
@@ -1323,6 +1524,30 @@ export function EditProfile() {
               </h2>
             </div>
             <div className="flex items-center gap-2 md:gap-4 shrink-0">
+              {/* Auto-save status — kept here at the top so it stays visible
+                  while editing, instead of being buried below the content. */}
+              <div className="flex items-center gap-1.5 min-w-0">
+                {uploadError ? (
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-red-500 truncate" title={`Upload error: ${uploadError}`}>
+                    Upload failed
+                  </span>
+                ) : saveStatus === "saving" || (isDirty && saveStatus !== "error") ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    <span className={`hidden sm:inline text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                      Saving…
+                    </span>
+                  </>
+                ) : saveStatus === "error" ? (
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-red-500 truncate" title={saveError || "Save failed"}>
+                    Save failed
+                  </span>
+                ) : saveStatus === "saved" ? (
+                  <span className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-green-400" : "text-green-600"}`}>
+                    <span className="sm:hidden">✓</span><span className="hidden sm:inline">✓ Saved</span>
+                  </span>
+                ) : null}
+              </div>
               {isCreatorOrAdmin && (
                 <button
                   type="button"
@@ -1431,7 +1656,7 @@ export function EditProfile() {
             </div>
           )}
 
-          <form className="flex flex-col flex-1 overflow-hidden" onSubmit={handleSubmit}>
+          <form className="flex flex-col flex-1 overflow-hidden" onSubmit={(e) => e.preventDefault()}>
             <div className={`p-4 md:p-6 overflow-y-auto flex-1 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
               <div className="space-y-6 max-w-2xl mx-auto">
 
@@ -2144,132 +2369,9 @@ export function EditProfile() {
               </div>
             </div>
 
-            <div className={`p-4 md:p-6 border-t-2 ${isDarkMode ? "border-white bg-black" : "border-black bg-white"}`}>
-              <div className="max-w-2xl mx-auto flex flex-col items-center gap-4">
-                <AnimatePresence>
-                  {showSaveSuccess && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="text-green-500 font-bold text-sm uppercase tracking-widest text-center"
-                    >
-                      Profile updated successfully!
-                    </motion.div>
-                  )}
-                  {saveError && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="text-red-500 font-bold text-sm uppercase tracking-widest text-center"
-                    >
-                      {saveError}
-                    </motion.div>
-                  )}
-                  {uploadError && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="text-red-500 font-bold text-sm uppercase tracking-widest text-center"
-                    >
-                      Upload error: {uploadError}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-                <div className="flex justify-center gap-3 md:gap-6 w-full">
-                  <button
-                    type="button"
-                    onClick={() => navigate(-1)}
-                    className={`px-4 py-3 md:px-8 md:py-4 text-xs md:text-sm font-bold uppercase tracking-widest border-2 transition-colors flex-1 md:flex-none ${
-                      isDarkMode
-                        ? "bg-transparent text-white hover:bg-white/10 border-white/30 hover:border-white"
-                        : "bg-transparent text-black hover:bg-black/10 border-black/30 hover:border-black"
-                    }`}
-                  >
-                    Discard
-                  </button>
-                  <button
-                    type="submit"
-                    className={`px-4 py-3 md:px-8 md:py-4 text-xs md:text-sm font-bold uppercase tracking-widest border-2 transition-colors flex-1 md:flex-none ${
-                      isDarkMode
-                        ? "bg-white text-black hover:bg-zinc-200 border-white"
-                        : "bg-black text-white hover:bg-zinc-800 border-black"
-                    }`}
-                  >
-                    Save Changes
-                  </button>
-                </div>
-              </div>
-            </div>
           </form>
         </div>
       </main>
-
-      {/* Unsaved changes modal — fires when the user tries to leave the page mid-edit. */}
-      <AnimatePresence>
-        {blocker.state === "blocked" && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className={`relative w-full max-w-md p-6 md:p-8 brutalist-border brutalist-shadow ${isDarkMode ? "bg-black text-white" : "bg-white text-black"}`}
-            >
-              <h3 className="text-lg md:text-xl font-bold uppercase tracking-widest mb-3">
-                Unsaved changes
-              </h3>
-              <p className={`text-sm font-medium mb-5 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-                You have changes that haven't been saved yet. What would you like to do?
-              </p>
-              {saveError && (
-                <div className={`mb-4 px-3 py-2 text-xs font-bold border-2 ${isDarkMode ? "border-red-500/50 text-red-400 bg-red-500/10" : "border-red-500/50 text-red-600 bg-red-50"}`}>
-                  {saveError}
-                </div>
-              )}
-              <div className="flex flex-col-reverse md:flex-row gap-3 md:justify-end">
-                <button
-                  type="button"
-                  onClick={handleBlockerCancel}
-                  disabled={savingFromBlocker}
-                  className={`px-4 py-3 text-xs font-bold uppercase tracking-widest border-2 transition-colors disabled:opacity-50 ${
-                    isDarkMode
-                      ? "border-white/30 text-white hover:bg-white/10"
-                      : "border-black/30 text-black hover:bg-black/5"
-                  }`}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleBlockerDiscard}
-                  disabled={savingFromBlocker}
-                  className={`px-4 py-3 text-xs font-bold uppercase tracking-widest border-2 transition-colors disabled:opacity-50 ${
-                    isDarkMode
-                      ? "border-red-500 text-red-400 hover:bg-red-500/10"
-                      : "border-red-500 text-red-600 hover:bg-red-50"
-                  }`}
-                >
-                  Discard changes
-                </button>
-                <button
-                  type="button"
-                  onClick={handleBlockerSaveAndContinue}
-                  disabled={savingFromBlocker}
-                  className={`px-4 py-3 text-xs font-bold uppercase tracking-widest border-2 transition-colors disabled:opacity-50 ${
-                    isDarkMode
-                      ? "bg-white text-black border-white hover:bg-zinc-200"
-                      : "bg-black text-white border-black hover:bg-zinc-800"
-                  }`}
-                >
-                  {savingFromBlocker ? "Saving..." : "Save & continue"}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       <CoverPreviewModal
         open={coverPreviewOpen}

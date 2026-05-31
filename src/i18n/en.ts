@@ -20,7 +20,7 @@ export const en: Record<string, string> = {
   // Banner tabs
   "tabs.explore": "EXPLORE",
   "tabs.gallery": "GALLERY",
-  "tabs.calendar": "CALENDAR",
+  "tabs.calendar": "EVENTS",
   "tabs.soon": "Soon",
 
   // FilterBar / Home filters

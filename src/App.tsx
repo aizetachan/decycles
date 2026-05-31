@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Routes, Route, useParams, Navigate } from "react-router-dom";
+import { Routes, Route, useParams, Navigate, useLocation } from "react-router-dom";
 import { Home } from "./pages/Home";
 import { Welcome } from "./pages/Welcome";
 import { EditProfile } from "./pages/EditProfile";
@@ -23,6 +23,8 @@ import { JoinModal } from "./components/modals/JoinModal";
 import { CreatorProfileModal } from "./components/modals/CreatorProfileModal";
 import { EventModal } from "./components/modals/EventModal";
 import { useUI } from "./contexts/UIContext";
+import { logEvent } from "firebase/analytics";
+import { analytics } from "./firebase";
 
 /**
  * Backward-compat handler for deep links to /creator/:id. The page is now a
@@ -40,6 +42,16 @@ function CreatorDeepLinkRedirect() {
 
 export default function App() {
   const { isDarkMode, isJoinModalOpen, setIsJoinModalOpen } = useUI();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (analytics) {
+      logEvent(analytics, "page_view", {
+        page_path: location.pathname + location.search,
+        page_title: document.title || "Decycles",
+      });
+    }
+  }, [location]);
 
   return (
     <>
