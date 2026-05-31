@@ -111,4 +111,10 @@ export const en: Record<string, string> = {
   "welcome.cta.signup": "Sign up free",
   "welcome.cta.browse": "Browse first",
   "welcome.cta.apply": "Apply to be listed",
+
+  // Cookies
+  "cookies.title": "COOKIE CONTROL",
+  "cookies.body": "We use analytical cookies to measure traffic and understand how you interact with the cycling directory. Do you accept their use?",
+  "cookies.accept": "ACCEPT",
+  "cookies.decline": "DECLINE",
 };

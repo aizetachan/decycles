@@ -11,6 +11,7 @@ import { DatePicker } from '../../components/ui/DatePicker';
 import { uploadImage, stripUndefined, normalizeUrl } from '../../lib/upload';
 import { CREATOR_DEFAULT_AVATAR, CREATOR_DEFAULT_COVER } from '../../lib/defaultAvatars';
 import { CoverPreviewModal } from '../../components/modals/CoverPreviewModal';
+import { GalleryManager } from '../../components/ui/GalleryManager';
 import { geocodeAddress } from '../../lib/geocode';
 import { EVENT_CATEGORIES } from '../../constants/categories';
 import { useCategories } from '../../contexts/CategoriesContext';
@@ -162,120 +163,6 @@ const ImageField = forwardRef<ImageFieldHandle, ImageFieldProps>(function ImageF
   );
 });
 
-interface GalleryFieldProps {
-  items: any[];
-  onChange: (items: any[]) => void;
-  folder: string;
-  isDarkMode: boolean;
-}
-
-function GalleryField({ items, onChange, folder, isDarkMode }: GalleryFieldProps) {
-  const [progress, setProgress] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const onDrop = async (files: File[]) => {
-    if (!files.length) return;
-    setError(null);
-    const perFile = files.map(() => 0);
-    setProgress(0);
-    try {
-      const uploaded = await Promise.all(
-        files.map((f, i) =>
-          uploadImage(f, folder, (pct) => {
-            perFile[i] = pct;
-            setProgress(perFile.reduce((a, b) => a + b, 0) / perFile.length);
-          }),
-        ),
-      );
-      const newItems = uploaded.map((url) => ({ url, description: '' }));
-      onChange([...items, ...newItems]);
-    } catch (err: any) {
-      console.error(err);
-      setError(err?.message || 'Upload failed');
-    } finally {
-      setProgress(null);
-    }
-  };
-  const uploading = progress !== null;
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: { 'image/*': [] },
-  } as any);
-
-  const inputClass = `w-full p-4 border-2 outline-none font-medium ${
-    isDarkMode ? 'bg-black border-zinc-700 focus:border-white' : 'bg-gray-50 border-gray-300 focus:border-black'
-  }`;
-
-  const updateUrl = (idx: number, url: string) => {
-    const next = [...items];
-    next[idx] = typeof next[idx] === 'string' ? { url, description: '' } : { ...next[idx], url };
-    onChange(next);
-  };
-  const removeItem = (idx: number) => onChange(items.filter((_, i) => i !== idx));
-  const addBlank = () => onChange([...items, { url: '', description: '' }]);
-
-  return (
-    <div className="space-y-3">
-      {items.map((item, idx) => {
-        const url = typeof item === 'string' ? item : item?.url || '';
-        return (
-          <div key={idx} className="flex items-start gap-3">
-            {url && <img src={url} alt="" className="w-16 h-16 object-cover border-2 border-current/20 shrink-0" referrerPolicy="no-referrer" />}
-            <input
-              type="text"
-              value={url}
-              onChange={(e) => updateUrl(idx, e.target.value)}
-              placeholder="https://..."
-              className={`min-w-0 flex-1 ${inputClass}`}
-            />
-            <button
-              type="button"
-              onClick={() => removeItem(idx)}
-              className={`p-3 border-2 shrink-0 ${isDarkMode ? 'border-zinc-700 text-red-400 hover:border-red-500' : 'border-gray-300 text-red-500 hover:border-red-500'}`}
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        );
-      })}
-      <div
-        {...getRootProps()}
-        className={`relative w-full p-6 border-2 border-dashed cursor-pointer flex flex-col items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest transition-colors ${
-          isDragActive
-            ? isDarkMode ? 'border-white bg-white/10 text-white' : 'border-black bg-black/10 text-black'
-            : isDarkMode ? 'border-zinc-700 text-gray-400 hover:border-white hover:text-white' : 'border-gray-300 text-gray-500 hover:border-black hover:text-black'
-        }`}
-      >
-        <input {...getInputProps()} />
-        <div className="flex items-center gap-2">
-          <Upload className="w-4 h-4" />
-          {uploading
-            ? `Uploading ${Math.round(progress!)}%`
-            : 'Drag & drop images, or click to upload'}
-        </div>
-        {uploading && (
-          <div className="w-full max-w-[260px] h-1.5 bg-current/20 overflow-hidden">
-            <div
-              className={`h-full ${isDarkMode ? 'bg-white' : 'bg-black'} transition-[width] duration-150 ease-out`}
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        )}
-      </div>
-      <button
-        type="button"
-        onClick={addBlank}
-        className={`w-full py-2 border-2 border-dashed flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest ${
-          isDarkMode ? 'border-zinc-700 text-gray-400 hover:border-white hover:text-white' : 'border-gray-300 text-gray-500 hover:border-black hover:text-black'
-        }`}
-      >
-        <Plus className="w-4 h-4" /> Add image URL manually
-      </button>
-      {error && <span className="text-xs text-red-500 font-bold">{error}</span>}
-    </div>
-  );
-}
 
 type AdminFormData = Partial<Creator> & {
   isPublished?: boolean;
@@ -1276,7 +1163,7 @@ export function AdminCreatorEdit() {
         {activeTab === 'GALLERY' && (
           <>
             <h2 className="text-xl font-bold uppercase tracking-wider mb-4 border-b-2 pb-2">Gallery</h2>
-            <GalleryField
+            <GalleryManager
               items={formData.gallery || []}
               onChange={(items) => setFormData(prev => ({ ...prev, gallery: items }))}
               folder={`creators/${id || 'new'}/gallery`}
@@ -1635,11 +1522,12 @@ export function AdminCreatorEdit() {
                               <label className={`block text-[10px] font-bold uppercase tracking-widest mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                                 Event Gallery
                               </label>
-                              <GalleryField
+                              <GalleryManager
                                 items={event.gallery || []}
                                 onChange={(items) => updateEvent(idx, { gallery: items })}
                                 folder={`creators/${id || 'new'}/events/${idx}/gallery`}
                                 isDarkMode={isDarkMode}
+                                maxItems={5}
                               />
                             </div>
                           </div>

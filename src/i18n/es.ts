@@ -110,4 +110,10 @@ export const es: Record<string, string> = {
   "welcome.cta.signup": "Registro gratuito",
   "welcome.cta.browse": "Explorar primero",
   "welcome.cta.apply": "Solicitar listado",
+
+  // Cookies
+  "cookies.title": "CONTROL DE COOKIES",
+  "cookies.body": "Utilizamos cookies de analítica para medir el tráfico y entender cómo interactúas con el directorio ciclista. ¿Aceptas su uso?",
+  "cookies.accept": "ACEPTAR",
+  "cookies.decline": "RECHAZAR",
 };

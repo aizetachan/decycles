@@ -23,6 +23,7 @@ import { JoinModal } from "./components/modals/JoinModal";
 import { CreatorProfileModal } from "./components/modals/CreatorProfileModal";
 import { EventModal } from "./components/modals/EventModal";
 import { useUI } from "./contexts/UIContext";
+import { CookieBanner } from "./components/layout/CookieBanner";
 import { useAuth } from "./contexts/AuthContext";
 import { Ban } from "lucide-react";
 
@@ -123,6 +124,7 @@ export default function App() {
       />
       <CreatorProfileModal />
       <EventModal />
+      <CookieBanner />
     </>
   );
 }

@@ -20,6 +20,7 @@ import { geocodeAddress } from "../lib/geocode";
 import { EVENT_CATEGORIES } from "../constants/categories";
 import { useCategories } from "../contexts/CategoriesContext";
 import { EventRowAttendees, EventAttendeesPanel } from "../components/events/EventAttendees";
+import { GalleryManager } from "../components/ui/GalleryManager";
 
 // Centered, full-cover overlay used on top of any image dropzone while an upload is in flight.
 function UploadSpinnerOverlay() {
@@ -241,8 +242,6 @@ export function EventEditorItem({
     !!(event.endDate && event.startDate && event.endDate !== event.startDate),
   );
   const [coverProgress, setCoverProgress] = useState<number | null>(null);
-  // Aggregate gallery upload progress (0..100) for the batch in flight; null = idle.
-  const [galleryProgress, setGalleryProgress] = useState<number | null>(null);
   // Address geocoding state — mirrors the shop address field so an event can be
   // pinned at its own specific location, independent of the shop's address.
   const [geocoding, setGeocoding] = useState(false);
@@ -308,75 +307,11 @@ export function EventEditorItem({
     }
   };
 
-  const onGalleryDrop = async (acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0 || !uid) return;
-    // Respect the 5-image cap — only take as many as there's room for.
-    const room = Math.max(0, 5 - (profileData.events[idx].gallery || []).length);
-    const files = acceptedFiles.slice(0, room);
-    if (files.length === 0) return;
-
-    // Optimistic blob previews so the user sees the images immediately while
-    // they upload. Each gets a stable key so we can swap it for the real URL.
-    const previews = files.map((file) => ({ blob: URL.createObjectURL(file), file }));
-    const startEvents = [...profileData.events];
-    const baseGallery = startEvents[idx].gallery || [];
-    startEvents[idx] = {
-      ...startEvents[idx],
-      gallery: [...baseGallery, ...previews.map((p) => ({ url: p.blob, description: "" }))].slice(0, 5),
-    };
-    setProfileData({ ...profileData, events: startEvents });
-    setGalleryProgress(0);
-
-    const perFile: number[] = files.map(() => 0);
-    try {
-      const urls = await Promise.all(
-        previews.map((p, i) =>
-          uploadImage(p.file, `creators/${uid}/events/${idx}/gallery`, (pct) => {
-            perFile[i] = pct;
-            setGalleryProgress(perFile.reduce((a, b) => a + b, 0) / perFile.length);
-          }),
-        ),
-      );
-      // Swap each optimistic blob URL for its uploaded download URL.
-      setProfileData((prev: any) => {
-        const evs = [...prev.events];
-        const gallery = (evs[idx].gallery || []).map((img: any) => {
-          const match = previews.findIndex((p) => p.blob === (typeof img === "string" ? img : img.url));
-          if (match === -1) return img;
-          return { url: urls[match], description: typeof img === "string" ? "" : img.description || "" };
-        });
-        evs[idx] = { ...evs[idx], gallery };
-        return { ...prev, events: evs };
-      });
-    } catch (err) {
-      console.error("Failed to upload event gallery images", err);
-      alert("Failed to upload one or more gallery images. Please try again.");
-      // Drop the failed optimistic previews so we never persist blob: URLs.
-      setProfileData((prev: any) => {
-        const evs = [...prev.events];
-        const gallery = (evs[idx].gallery || []).filter(
-          (img: any) => !previews.some((p) => p.blob === (typeof img === "string" ? img : img.url)),
-        );
-        evs[idx] = { ...evs[idx], gallery };
-        return { ...prev, events: evs };
-      });
-    } finally {
-      setGalleryProgress(null);
-      previews.forEach((p) => URL.revokeObjectURL(p.blob));
-    }
-  };
-
   const {
     getRootProps: getCoverRootProps,
     getInputProps: getCoverInputProps,
     isDragActive: isCoverDragActive,
   } = useDropzone({ onDrop: onCoverDrop, accept: { "image/*": [] }, maxFiles: 1 } as any);
-
-  const {
-    getRootProps: getGalleryRootProps,
-    getInputProps: getGalleryInputProps,
-    isDragActive: isGalleryDragActive,
-  } = useDropzone({ onDrop: onGalleryDrop, accept: { "image/*": [] }, maxFiles: 5 } as any);
 
   // An event needs a resolvable location to pin on the map: its own geocoded
   // coordinates, or — for shop owners — the shop's coordinates as a fallback.
@@ -807,56 +742,24 @@ export function EventEditorItem({
           </div>
         </div>
 
-        {/* Event Gallery */}
+        {/* Event Gallery — multi-upload + drag-to-reorder. */}
         <div className="pt-4">
           <label className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
             Event Gallery Images (Max 5)
           </label>
-          <div className="space-y-4 mt-2">
-            {(event.gallery || []).map((img: any, imgIdx: number) => {
-              const imgUrl = typeof img === "string" ? img : img.url;
-              return (
-                <div key={imgIdx} className="flex flex-col gap-2">
-                  <div className="flex items-center gap-4">
-                    <img src={imgUrl} alt={`Event Gallery ${imgIdx + 1}`} className="w-20 h-16 object-cover border-2 border-white/20" referrerPolicy="no-referrer" />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newEvents = [...profileData.events];
-                        const newGallery = (newEvents[idx].gallery || []).filter((_: any, i: number) => i !== imgIdx);
-                        newEvents[idx] = { ...newEvents[idx], gallery: newGallery };
-                        setProfileData({ ...profileData, events: newEvents });
-                      }}
-                      className={`p-2 border-2 transition-colors ${
-                        isDarkMode
-                          ? "border-white/20 hover:border-red-500 hover:bg-red-500 hover:text-white"
-                          : "border-black/20 hover:border-red-500 hover:bg-red-500 hover:text-white"
-                      }`}
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-            {(!event.gallery || event.gallery.length < 5) && (
-              <div
-                {...getGalleryRootProps()}
-                className={`relative w-full p-6 border-2 border-dashed text-center cursor-pointer transition-colors ${
-                  isGalleryDragActive
-                    ? "border-black bg-black/5"
-                    : isDarkMode
-                    ? "border-white/20 hover:border-white/40 hover:bg-white/5"
-                    : "border-black/20 hover:border-black/40 hover:bg-black/5"
-                }`}
-              >
-                <input {...getGalleryInputProps()} />
-                <span className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                  Drag & drop images here, or click to select
-                </span>
-                {galleryProgress !== null && <UploadProgressOverlay percent={galleryProgress} />}
-              </div>
-            )}
+          <div className="mt-2">
+            <GalleryManager
+              items={event.gallery || []}
+              onChange={(gallery) => {
+                const newEvents = [...profileData.events];
+                newEvents[idx] = { ...newEvents[idx], gallery };
+                setProfileData({ ...profileData, events: newEvents });
+              }}
+              folder={`creators/${uid}/events/${idx}/gallery`}
+              isDarkMode={isDarkMode}
+              maxItems={5}
+              disabled={!uid}
+            />
           </div>
         </div>
       </div>
@@ -1019,7 +922,6 @@ export function EditProfile() {
   const [profileImageUploading, setProfileImageUploading] = useState(false);
   const [shopProfileImageUploading, setShopProfileImageUploading] = useState(false);
   const [coverUploadProgress, setCoverUploadProgress] = useState<number | null>(null);
-  const [galleryUploadProgress, setGalleryUploadProgress] = useState<number | null>(null);
 
   // Publish gating — recompute on every render so the toggle and missing-list react live.
   const publishMissing = useMemo(() => shopPublishMissing(profileData), [profileData]);
@@ -1319,34 +1221,6 @@ export function EditProfile() {
     }
   };
 
-  const handleGalleryUpload = async (files: File[]) => {
-    if (!files.length || !currentUser || !shopFolder) return;
-    setUploadError(null);
-    // Aggregate progress across the batch so the user sees one bar.
-    const perFile: number[] = files.map(() => 0);
-    setGalleryUploadProgress(0);
-    try {
-      const urls = await Promise.all(
-        files.map((f, i) =>
-          uploadImage(f, `${shopFolder}/gallery`, (pct) => {
-            perFile[i] = pct;
-            const avg = perFile.reduce((a, b) => a + b, 0) / perFile.length;
-            setGalleryUploadProgress(avg);
-          }),
-        ),
-      );
-      setProfileData((prev) => ({
-        ...prev,
-        gallery: [...prev.gallery, ...urls.map((url) => ({ url, description: "" }))].slice(0, 8),
-      }));
-    } catch (err: any) {
-      console.error(err);
-      setUploadError(err?.message || "Upload failed");
-    } finally {
-      setGalleryUploadProgress(null);
-    }
-  };
-
   const {
     getRootProps: getEditProfileRootProps,
     getInputProps: getEditProfileInputProps,
@@ -1374,12 +1248,6 @@ export function EditProfile() {
     getInputProps: getShopProfileInputProps,
     isDragActive: isShopProfileDragActive,
   } = useDropzone({ onDrop: handleShopProfileImageUpload, accept: { "image/*": [] }, maxFiles: 1 } as any);
-
-  const {
-    getRootProps: getEditGalleryRootProps,
-    getInputProps: getEditGalleryInputProps,
-    isDragActive: isEditGalleryDragActive,
-  } = useDropzone({ onDrop: handleGalleryUpload, accept: { "image/*": [] }, maxFiles: 8 } as any);
 
   // NOTE: role changes (user ↔ creator ↔ admin) are now exclusively done by
   // admins from the /admin/users panel. The previous in-page promote/demote
@@ -2317,52 +2185,14 @@ export function EditProfile() {
                     <label className={`block text-xs font-bold uppercase tracking-widest mb-4 ${isDarkMode ? "text-white" : "text-black"}`}>
                       Gallery Images (Max 8)
                     </label>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                      {Array.from({ length: 8 }).map((_, idx) => {
-                        const img = profileData.gallery[idx];
-                        // Show the upload progress bar on the first empty slot during a batch upload.
-                        const firstEmptyIdx = profileData.gallery.length;
-                        const showProgressHere = galleryUploadProgress !== null && idx === firstEmptyIdx;
-                        return (
-                          <div key={idx} className={`relative flex flex-col border-2 border-dashed ${isDarkMode ? "border-white/40 hover:border-white" : "border-black/40 hover:border-black"} overflow-hidden group transition-colors`}>
-                            {img ? (
-                              <div className="relative aspect-[4/3] w-full">
-                                <img src={img.url || img} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newGallery = profileData.gallery.filter((_, i) => i !== idx);
-                                    setProfileData({ ...profileData, gallery: newGallery });
-                                  }}
-                                  className={`absolute top-2 right-2 p-2 border-2 opacity-100 transition-all ${
-                                    isDarkMode
-                                      ? "bg-black/80 text-white border-white hover:bg-red-500 hover:border-red-500"
-                                      : "bg-white/80 text-black border-black hover:bg-red-500 hover:text-white hover:border-red-500"
-                                  }`}
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ) : (
-                              <div
-                                {...getEditGalleryRootProps()}
-                                className={`relative w-full aspect-[4/3] flex items-center justify-center cursor-pointer transition-colors ${
-                                  isEditGalleryDragActive
-                                    ? "bg-black/40"
-                                    : isDarkMode
-                                    ? "bg-white/5 hover:bg-white/10"
-                                    : "bg-black/5 hover:bg-black/10"
-                                }`}
-                              >
-                                <input {...getEditGalleryInputProps()} />
-                                <Plus className={`w-8 h-8 transition-opacity ${isDarkMode ? "text-white/50 group-hover:text-white" : "text-black/50 group-hover:text-black"}`} />
-                                {showProgressHere && <UploadProgressOverlay percent={galleryUploadProgress!} />}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <GalleryManager
+                      items={profileData.gallery || []}
+                      onChange={(gallery) => setProfileData({ ...profileData, gallery })}
+                      folder={shopFolder ? `${shopFolder}/gallery` : "gallery"}
+                      isDarkMode={isDarkMode}
+                      maxItems={8}
+                      disabled={!shopFolder}
+                    />
                   </div>
                 )}
 
