@@ -72,7 +72,7 @@ const SortableTile: React.FC<{
         isDragging ? "ring-2 ring-current" : ""
       } ${isDarkMode ? "border-white/20 bg-zinc-900" : "border-black/20 bg-gray-100"}`}
     >
-      <img src={item.url} alt={`Gallery ${index + 1}`} className="w-full h-full object-cover pointer-events-none" referrerPolicy="no-referrer" />
+      <img src={item.url} alt={`Gallery ${index + 1}`} className="w-full h-full object-cover pointer-events-none" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
 
       {/* Full-cover drag handle. */}
       <div

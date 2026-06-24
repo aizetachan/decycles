@@ -37,6 +37,8 @@ export function CreatorGrid({ isDarkMode, filteredCreators, setSelectedCreator }
                 alt={creator.name}
                 className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500"
                 referrerPolicy="no-referrer"
+                loading="lazy"
+                decoding="async"
               />
 
               {/* Category Badges */}

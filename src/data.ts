@@ -9,7 +9,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/kapzguru"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1532298229144-0ec0c57515c7?auto=format&fit=crop&w=800&q=80"
@@ -30,7 +30,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/officinabattaglin/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -48,7 +48,7 @@ export const creators: Creator[] = [
     name: "Ricca Cycling",
     description: "Ricca Cycling designs premium steel bicycles in Switzerland, which are then meticulously handcrafted in Europe. Their focus is on blending timeless aesthetics with modern geometry to create bikes that are both beautiful and highly capable on any terrain.",
     website: "https://riccacycling.ch/",
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1576435728678-68d0fbf94e91?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?auto=format&fit=crop&w=800&q=80"
@@ -66,7 +66,7 @@ export const creators: Creator[] = [
     name: "Diamant",
     description: "A historic German bicycle brand offering a wide range of production bikes, including gravel, urban, and e-bikes. With over a century of experience, Diamant continues to innovate while staying true to its roots of reliable, everyday cycling solutions.",
     website: "https://www.diamantrad.com/de-DE/",
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -84,7 +84,7 @@ export const creators: Creator[] = [
     name: "Voodoo Cycles",
     description: "Voodoo Cycles offers a diverse range of production bikes including road, mountain, gravel, and e-bikes. Known for their distinctive styling and robust builds, they cater to riders looking for adventure and performance on the trails and roads.",
     website: "https://voodoocycles.com/",
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80"
@@ -102,7 +102,7 @@ export const creators: Creator[] = [
     name: "Brevet Cycles",
     description: "Brevet Cycles specializes in bespoke custom builds and traditional frame building. Every bicycle is tailored to the rider's specific measurements and riding style, ensuring an unparalleled fit and a truly unique cycling experience.",
     website: "https://brevetcycles.com/",
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -123,7 +123,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/bikepackingcom/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80"
@@ -144,7 +144,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/divisioncyclingclub/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1532298229144-0ec0c57515c7?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80"
@@ -165,7 +165,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/venividi.cc/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -186,7 +186,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/mbocycling_official"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -207,7 +207,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/radrace/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -228,7 +228,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/festivalciclick/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -250,7 +250,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/primaveraciclistabergueda/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -271,7 +271,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/ccvolata/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -292,7 +292,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/atelier_medium/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -313,7 +313,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/barzoale/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -334,7 +334,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/retrobikeshow1/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -356,7 +356,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/pedaldefilicarbo/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -378,7 +378,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/bikefriday/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -399,7 +399,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/parktoolblue/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -420,7 +420,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/tons.bike/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -441,7 +441,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/berdspokes/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -462,7 +462,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/massacriticabcn/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -484,7 +484,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/editvelogirona/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -505,7 +505,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/808dpi/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -526,7 +526,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/courssilpleut/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -547,7 +547,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/veneto.trail/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -569,7 +569,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/littlejamesarnold"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -590,7 +590,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/filofficina/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -611,7 +611,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/velocityusa/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -632,7 +632,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/frasen_wheelworks/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -652,7 +652,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/hexcomponents"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -672,7 +672,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/paragonmachine"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -690,7 +690,7 @@ export const creators: Creator[] = [
     description: "Custom frame building based in South Africa, crafting bespoke bicycles tailored to the rider.",
     website: "https://mercerbikes.co.za/",
     socials: {},
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -710,7 +710,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/theactivehobo/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -730,7 +730,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/velocrushzurich/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -750,7 +750,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/crumbworks.co/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -770,7 +770,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/mutinybikes/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -790,7 +790,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/blink.artwork"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -810,7 +810,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/etb.academy/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -830,7 +830,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/agavefinishworks/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -850,7 +850,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/takagicycleworks/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -868,7 +868,7 @@ export const creators: Creator[] = [
     description: "Custom steel road and mountain bikes.",
     website: "https://selwynbicycles.com/",
     socials: {},
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"
@@ -888,7 +888,7 @@ export const creators: Creator[] = [
     socials: {
       instagram: "https://www.instagram.com/sramroad/"
     },
-    coverImage: "/cover-creator/cover-creator.png",
+    coverImage: "/cover-creator/cover-creator.webp",
     gallery: [
       "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=80",
       "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=800&q=80"

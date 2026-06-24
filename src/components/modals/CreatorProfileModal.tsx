@@ -495,6 +495,8 @@ export function CreatorProfileModal() {
                                   alt={`${selectedCreator?.name} gallery ${safeIdx + 1}`}
                                   className="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105"
                                   referrerPolicy="no-referrer"
+                                  loading="lazy"
+                                  decoding="async"
                                 />
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                                   <Maximize2 className="text-white opacity-0 group-hover:opacity-100 transition-opacity w-8 h-8 drop-shadow-md" />
@@ -524,6 +526,8 @@ export function CreatorProfileModal() {
                                           alt={`${selectedCreator?.name} thumbnail ${idx + 1}`}
                                           className="w-full h-full object-cover"
                                           referrerPolicy="no-referrer"
+                                          loading="lazy"
+                                          decoding="async"
                                         />
                                       </button>
                                     );

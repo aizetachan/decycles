@@ -109,7 +109,7 @@ export const GalleryImageModal: React.FC<GalleryImageModalProps> = ({
                       }`}
                       aria-label={`Show image ${i + 1}`}
                     >
-                      <img src={url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={url} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" loading="lazy" decoding="async" />
                     </button>
                   ))}
                 </div>

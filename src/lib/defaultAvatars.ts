@@ -2,17 +2,18 @@
  * Default avatars served from /public-equivalent (publicDir is `assets/`).
  *
  * Files live at:
- *   assets/avatars/users/avatar01.png ... avatar06.png   (random user defaults)
- *   assets/avatars/avatar-creator.png                    (fixed shop default)
+ *   assets/avatars/users/avatar01.webp ... avatar06.webp  (random user defaults)
+ *   assets/avatars/avatar-creator.webp                     (fixed shop default)
  *
- * Adding a new user avatar = drop a `avatar07.png` (etc.) into the folder
- * and bump USER_AVATAR_COUNT below.
+ * Adding a new user avatar = drop a `avatar07.webp` (etc.) into the folder
+ * and bump USER_AVATAR_COUNT below. Keep them as optimized WebP — see
+ * scripts/optimize-assets.cjs.
  */
 
 const USER_AVATAR_COUNT = 6;
 
 const userAvatarPath = (n: number): string =>
-  `/avatars/users/avatar${String(n).padStart(2, "0")}.png`;
+  `/avatars/users/avatar${String(n).padStart(2, "0")}.webp`;
 
 /**
  * Returns the URL of a random user-default avatar. Used when signing up
@@ -27,15 +28,15 @@ export function randomUserAvatar(): string {
  * Default shop profile image applied when a creator account is first created
  * and they haven't uploaded their own logo yet.
  */
-export const CREATOR_DEFAULT_AVATAR = "/avatars/avatar-creator.png";
+export const CREATOR_DEFAULT_AVATAR = "/avatars/avatar-creator.webp";
 
 /**
- * Default shop cover. Lives at assets/cover-creator/cover-creator.png and is
+ * Default shop cover. Lives at assets/cover-creator/cover-creator.webp and is
  * served at the root URL because publicDir is `assets/`. Applied automatically
  * to any shop without an uploaded cover, so home cards and profile pages always
  * have something to render.
  */
-export const CREATOR_DEFAULT_COVER = "/cover-creator/cover-creator.png";
+export const CREATOR_DEFAULT_COVER = "/cover-creator/cover-creator.webp";
 
 /**
  * True if the URL points to one of the bundled default avatars. Useful when

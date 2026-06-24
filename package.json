@@ -10,6 +10,8 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "seed": "tsx scripts/seed.ts",
+    "optimize:assets": "node scripts/optimize-assets.cjs",
+    "optimize:storage": "node scripts/optimize-storage-images.cjs",
     "deploy": "npm run build && cp dist/index.html functions/template.html && node scripts/generate-sitemap.cjs && firebase deploy --only hosting,functions,firestore:rules --project decycles-web-app-1777399378"
   },
   "dependencies": {
@@ -40,6 +42,7 @@
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
     "firebase-admin": "^13.8.0",
+    "sharp": "^0.35.2",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",

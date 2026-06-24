@@ -1,23 +1,32 @@
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../firebase";
+import { compressImage, type CompressOptions } from "./imageCompression";
 
 /**
  * Upload a single image to Firebase Storage and return its public download URL.
+ *
+ * The file is optimized (downscaled + re-encoded to WebP) in the browser before
+ * upload — see compressImage. This applies to every image entry point: user &
+ * shop avatars, shop & event covers, and shop & event galleries.
  *
  * @param file - The file to upload.
  * @param folder - Path prefix in the bucket (e.g. "creators/miau", "users/abc123").
  *                 We append a timestamp + sanitized filename to keep names unique.
  * @param onProgress - Optional progress callback (0..100). Called as bytes upload.
+ * @param compress - Optional override of the compression settings (max edge /
+ *                   quality). Pass `false` to upload the original untouched.
  */
 export async function uploadImage(
   file: File,
   folder: string,
   onProgress?: (percent: number) => void,
+  compress: CompressOptions | false = {},
 ): Promise<string> {
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const toUpload = compress === false ? file : await compressImage(file, compress);
+  const safeName = toUpload.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const path = `${folder}/${Date.now()}_${safeName}`;
   const storageRef = ref(storage, path);
-  const task = uploadBytesResumable(storageRef, file, { contentType: file.type });
+  const task = uploadBytesResumable(storageRef, toUpload, { contentType: toUpload.type });
   return new Promise((resolve, reject) => {
     task.on(
       "state_changed",
