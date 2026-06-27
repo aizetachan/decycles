@@ -14,8 +14,74 @@ const { logger } = require("firebase-functions/v2");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore } = require("firebase-admin/firestore");
+const { getStorage } = require("firebase-admin/storage");
 
 initializeApp();
+
+// Storage bucket that backs user/creator image uploads. Used to keep the bucket
+// free of orphans: deleting an account wipes its objects, and replacing/removing
+// an image deletes the object it superseded (see cleanupReplacedImages*).
+const STORAGE_BUCKET = "decycles-web-app-1777399378.firebasestorage.app";
+
+// Extract the Storage object path from a download URL if it lives in OUR bucket,
+// else null (bundled default like "/avatars/…", external image, blob:, etc.).
+function bucketObjectPath(value) {
+  if (typeof value !== "string" || !/^https?:\/\//i.test(value)) return null;
+  let u;
+  try {
+    u = new URL(value);
+  } catch {
+    return null;
+  }
+  if (u.hostname === "firebasestorage.googleapis.com") {
+    const m = u.pathname.match(/\/v0\/b\/([^/]+)\/o\/(.+)$/);
+    return m && m[1] === STORAGE_BUCKET ? decodeURIComponent(m[2]) : null;
+  }
+  if (u.hostname === "storage.googleapis.com") {
+    const m = u.pathname.match(/^\/([^/]+)\/(.+)$/);
+    return m && m[1] === STORAGE_BUCKET ? decodeURIComponent(m[2]) : null;
+  }
+  return null;
+}
+
+// Recursively collect every Storage object path referenced anywhere in a doc's
+// data (scalars, gallery arrays, events[].gallery, …) that sits under `prefix`.
+function collectBucketRefs(value, prefix, into) {
+  if (typeof value === "string") {
+    const p = bucketObjectPath(value);
+    if (p && p.startsWith(prefix)) into.add(p);
+  } else if (Array.isArray(value)) {
+    for (const v of value) collectBucketRefs(v, prefix, into);
+  } else if (value && typeof value === "object") {
+    for (const v of Object.values(value)) collectBucketRefs(v, prefix, into);
+  }
+}
+
+// Delete objects that the doc referenced before a write but no longer does —
+// i.e. images that were replaced (cover/profile/avatar re-upload) or removed
+// (gallery item). Scoped to the doc's own prefix so it can never touch another
+// account's files, and only deletes objects no field still points to (so two
+// fields sharing one object never orphan-delete it).
+async function cleanupSupersededImages(prefix, before, after, tag) {
+  const beforeRefs = new Set();
+  const afterRefs = new Set();
+  collectBucketRefs(before, prefix, beforeRefs);
+  collectBucketRefs(after, prefix, afterRefs);
+  const stale = [...beforeRefs].filter((p) => !afterRefs.has(p));
+  if (!stale.length) return;
+  const bucket = getStorage().bucket(STORAGE_BUCKET);
+  await Promise.all(
+    stale.map((p) =>
+      bucket
+        .file(p)
+        .delete()
+        .catch((e) => {
+          if (e?.code !== 404) logger.warn(`[${tag}] could not delete ${p}:`, e?.message || e);
+        }),
+    ),
+  );
+  logger.info(`[${tag}] deleted ${stale.length} superseded object(s) under ${prefix}`);
+}
 
 // The Gen2 default runtime SA (PROJECT_NUMBER-compute@…) lacks Firebase Auth
 // admin permission, so getAuth() admin operations (setCustomUserClaims,
@@ -63,6 +129,34 @@ exports.syncAdminClaim = onDocumentWritten(
       // Log and move on — we don't want to block other Firestore writes.
       logger.error(`[syncAdminClaim] failed for ${uid}:`, err);
     }
+  },
+);
+
+// When a creator/user doc is written, delete any Storage object it referenced
+// before but no longer does — i.e. a replaced cover/profile/avatar or a removed
+// gallery image. Keeps the bucket from accumulating superseded uploads. Scoped
+// to the doc's own prefix and only deletes objects no remaining field points to.
+exports.cleanupCreatorImages = onDocumentWritten(
+  { document: "creators/{creatorId}", region: "us-central1" },
+  async (event) => {
+    await cleanupSupersededImages(
+      `creators/${event.params.creatorId}/`,
+      event.data?.before?.data(),
+      event.data?.after?.data(),
+      "cleanupCreatorImages",
+    );
+  },
+);
+
+exports.cleanupUserImages = onDocumentWritten(
+  { document: "users/{userId}", region: "us-central1" },
+  async (event) => {
+    await cleanupSupersededImages(
+      `users/${event.params.userId}/`,
+      event.data?.before?.data(),
+      event.data?.after?.data(),
+      "cleanupUserImages",
+    );
   },
 );
 
@@ -135,6 +229,18 @@ exports.adminDeleteUser = onCall(
         // An already-missing Auth account is fine — the docs are gone.
         if (e?.code !== "auth/user-not-found") throw e;
       });
+    // Wipe the account's Storage objects too, so nothing is left orphaned in
+    // the bucket. force:true keeps going past individual failures; failures
+    // here must not fail the whole delete (the account is already gone).
+    const bucket = getStorage().bucket(STORAGE_BUCKET);
+    await Promise.all([
+      bucket
+        .deleteFiles({ prefix: `users/${uid}/`, force: true })
+        .catch((e) => logger.warn(`[adminDeleteUser] storage cleanup users/${uid} failed:`, e?.message || e)),
+      bucket
+        .deleteFiles({ prefix: `creators/${uid}/`, force: true })
+        .catch((e) => logger.warn(`[adminDeleteUser] storage cleanup creators/${uid} failed:`, e?.message || e)),
+    ]);
     return { ok: true };
   } catch (err) {
     logger.error(`[adminDeleteUser] failed for ${uid}:`, err);
