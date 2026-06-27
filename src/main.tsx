@@ -7,6 +7,7 @@ import { AuthProvider } from './contexts/AuthContext.tsx';
 import { UIProvider } from './contexts/UIContext.tsx';
 import { CategoriesProvider } from './contexts/CategoriesContext.tsx';
 import { LanguageProvider } from './contexts/LanguageContext.tsx';
+import { ImageCropperProvider } from './components/ui/ImageCropperProvider.tsx';
 
 // Data router (not BrowserRouter) is required for `useBlocker` in v7.
 // App keeps its own internal <Routes> tree under this catch-all.
@@ -20,7 +21,9 @@ createRoot(document.getElementById('root')!).render(
       <AuthProvider>
         <UIProvider>
           <CategoriesProvider>
-            <RouterProvider router={router} />
+            <ImageCropperProvider>
+              <RouterProvider router={router} />
+            </ImageCropperProvider>
           </CategoriesProvider>
         </UIProvider>
       </AuthProvider>

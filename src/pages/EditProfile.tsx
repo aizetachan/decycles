@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { X, Plus, MapPin, Loader2, ChevronDown, ChevronUp, Search, Calendar as CalIcon } from "lucide-react";
+import { X, Plus, MapPin, Loader2, ChevronDown, ChevronUp, Search, Calendar as CalIcon, Pencil } from "lucide-react";
 import { DatePicker } from "../components/ui/DatePicker";
 import { motion, AnimatePresence } from "motion/react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -11,10 +11,10 @@ import { useAuth } from "../contexts/AuthContext";
 import { useUI } from "../contexts/UIContext";
 import { Header } from "../components/layout/Header";
 import { PasswordSetupForm } from "../components/auth/PasswordSetupForm";
-import { CoverPreviewModal } from "../components/modals/CoverPreviewModal";
 import { Category, SubCategory, Creator } from "../types";
 import { db } from "../firebase";
 import { uploadImage, stripUndefined, normalizeUrl, isEphemeralUrl } from "../lib/upload";
+import { useCropper } from "../components/ui/ImageCropperProvider";
 import { CREATOR_DEFAULT_AVATAR, CREATOR_DEFAULT_COVER, randomUserAvatar } from "../lib/defaultAvatars";
 import { geocodeAddress } from "../lib/geocode";
 import { EVENT_CATEGORIES } from "../constants/categories";
@@ -246,6 +246,7 @@ export function EventEditorItem({
     !!(event.endDate && event.startDate && event.endDate !== event.startDate),
   );
   const [coverProgress, setCoverProgress] = useState<number | null>(null);
+  const cropImage = useCropper();
   // Address geocoding state — mirrors the shop address field so an event can be
   // pinned at its own specific location, independent of the shop's address.
   const [geocoding, setGeocoding] = useState(false);
@@ -282,9 +283,31 @@ export function EventEditorItem({
     }
   };
 
+  const EVENT_COVER_CROP = {
+    aspect: 16 / 9,
+    safeZoneWidthPct: 75,
+    title: "Crop the event cover",
+    hint: "The marked center is what shows on cards.",
+    safeZoneLabel: "Visible on cards",
+    minWidth: 800,
+  };
+
   const onCoverDrop = async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0 || !uid) return;
-    const file = acceptedFiles[0];
+    // Crop to the 16:9 cover ratio (center 75% is the home-card safe zone).
+    const file = await cropImage(acceptedFiles[0], EVENT_COVER_CROP);
+    if (!file) return; // cancelled
+    await uploadEventCoverFile(file);
+  };
+
+  // Click-to-edit the event cover already in place.
+  const editEventCover = async () => {
+    if (!event.coverImage || !uid) return;
+    const file = await cropImage(event.coverImage, EVENT_COVER_CROP);
+    if (file) await uploadEventCoverFile(file);
+  };
+
+  const uploadEventCoverFile = async (file: File) => {
     // Optimistic preview while the upload is in flight.
     const blobPreview = URL.createObjectURL(file);
     const startEvents = [...profileData.events];
@@ -729,8 +752,13 @@ export function EventEditorItem({
           </label>
           <div className="flex flex-col gap-3 mt-2">
             {event.coverImage && (
-              <div className="relative w-full">
+              <div className="relative w-full group cursor-pointer" onClick={editEventCover} title="Edit image">
                 <img src={event.coverImage} alt="Event Cover" className="w-full h-32 object-cover border-2 border-white/20" referrerPolicy="no-referrer" />
+                <div className="absolute inset-0 flex items-center justify-center bg-transparent group-hover:bg-black/30 transition-colors">
+                  <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Pencil className="w-3.5 h-3.5" /> Edit
+                  </span>
+                </div>
                 {coverProgress !== null && <UploadProgressOverlay percent={coverProgress} />}
               </div>
             )}
@@ -944,7 +972,6 @@ export function EditProfile() {
   // Cover preview modal — shown automatically right after a successful upload
   // so the creator can verify their image is framed correctly for both the
   // home card (side crop) and the profile page (top/bottom crop).
-  const [coverPreviewOpen, setCoverPreviewOpen] = useState(false);
 
   const handleAddressBlur = async () => {
     const address = profileData.address?.trim();
@@ -1186,13 +1213,28 @@ export function EditProfile() {
 
   const userFolder = currentUser ? `users/${currentUser.uid}` : null;
   const shopFolder = currentUser ? `creators/${currentUser.uid}` : null;
+  const cropImage = useCropper();
 
-  const handlePersonalImageUpload = async (files: File[]) => {
-    if (!files.length || !currentUser || !userFolder) return;
+  // Crop presets per image slot — reused for both new uploads and editing the
+  // image already in place (click-to-edit). The cropper accepts a File (new
+  // pick) or the URL of the current image (edit existing).
+  const AVATAR_CROP = { aspect: 1, cropShape: "round" as const, title: "Crop your profile photo", minWidth: 256 };
+  const LOGO_CROP = { aspect: 1, cropShape: "round" as const, title: "Crop your shop logo", minWidth: 256 };
+  const COVER_CROP = {
+    aspect: 16 / 9,
+    safeZoneWidthPct: 75,
+    title: "Crop your shop cover",
+    hint: "The marked center is what shows on the home cards.",
+    safeZoneLabel: "Visible on cards",
+    minWidth: 800,
+  };
+
+  const uploadPersonalAvatar = async (file: File) => {
+    if (!currentUser || !userFolder) return;
     setUploadError(null);
     setProfileImageUploading(true);
     try {
-      const url = await uploadImage(files[0], `${userFolder}/avatar`);
+      const url = await uploadImage(file, `${userFolder}/avatar`);
       setProfileData((prev) => ({ ...prev, profileImage: url }));
     } catch (err: any) {
       console.error(err);
@@ -1201,13 +1243,23 @@ export function EditProfile() {
       setProfileImageUploading(false);
     }
   };
+  const handlePersonalImageUpload = async (files: File[]) => {
+    if (!files.length) return;
+    const cropped = await cropImage(files[0], AVATAR_CROP);
+    if (cropped) await uploadPersonalAvatar(cropped);
+  };
+  const editPersonalImage = async () => {
+    if (!profileData.profileImage) return;
+    const cropped = await cropImage(profileData.profileImage, AVATAR_CROP);
+    if (cropped) await uploadPersonalAvatar(cropped);
+  };
 
-  const handleShopProfileImageUpload = async (files: File[]) => {
-    if (!files.length || !currentUser || !shopFolder) return;
+  const uploadShopProfile = async (file: File) => {
+    if (!currentUser || !shopFolder) return;
     setUploadError(null);
     setShopProfileImageUploading(true);
     try {
-      const url = await uploadImage(files[0], `${shopFolder}/profile`);
+      const url = await uploadImage(file, `${shopFolder}/profile`);
       setProfileData((prev) => ({ ...prev, shopProfileImage: url }));
     } catch (err: any) {
       console.error(err);
@@ -1216,25 +1268,40 @@ export function EditProfile() {
       setShopProfileImageUploading(false);
     }
   };
+  const handleShopProfileImageUpload = async (files: File[]) => {
+    if (!files.length) return;
+    const cropped = await cropImage(files[0], LOGO_CROP);
+    if (cropped) await uploadShopProfile(cropped);
+  };
+  const editShopProfileImage = async () => {
+    if (!profileData.shopProfileImage) return;
+    const cropped = await cropImage(profileData.shopProfileImage, LOGO_CROP);
+    if (cropped) await uploadShopProfile(cropped);
+  };
 
-  const handleCoverUpload = async (files: File[]) => {
-    if (!files.length || !currentUser || !shopFolder) return;
+  const uploadCover = async (file: File) => {
+    if (!currentUser || !shopFolder) return;
     setUploadError(null);
     setCoverUploadProgress(0);
     try {
-      const url = await uploadImage(files[0], `${shopFolder}/cover`, (pct) =>
-        setCoverUploadProgress(pct),
-      );
+      const url = await uploadImage(file, `${shopFolder}/cover`, (pct) => setCoverUploadProgress(pct));
       setProfileData((prev) => ({ ...prev, coverImage: url }));
-      // Pop the safe-zone preview modal so the creator can confirm their
-      // image is framed correctly before saving.
-      setCoverPreviewOpen(true);
     } catch (err: any) {
       console.error(err);
       setUploadError(err?.message || "Upload failed");
     } finally {
       setCoverUploadProgress(null);
     }
+  };
+  const handleCoverUpload = async (files: File[]) => {
+    if (!files.length) return;
+    const cropped = await cropImage(files[0], COVER_CROP);
+    if (cropped) await uploadCover(cropped);
+  };
+  const editCoverImage = async () => {
+    if (!profileData.coverImage) return;
+    const cropped = await cropImage(profileData.coverImage, COVER_CROP);
+    if (cropped) await uploadCover(cropped);
   };
 
   const {
@@ -1594,21 +1661,30 @@ export function EditProfile() {
                           {profileData.profileImage && (
                             <img src={profileData.profileImage} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                           )}
-                          <div
-                            {...getEditProfileRootProps()}
-                            className={`absolute inset-0 flex items-center justify-center cursor-pointer transition-colors ${
-                              isEditProfileDragActive
-                                ? "bg-black/40"
-                                : profileData.profileImage
-                                ? "bg-black/20 hover:bg-black/40"
-                                : isDarkMode
-                                ? "bg-white/5 hover:bg-white/10"
-                                : "bg-black/5 hover:bg-black/10"
-                            }`}
-                          >
-                            <input {...getEditProfileInputProps()} />
-                            <Plus className={`w-8 h-8 transition-opacity ${profileData.profileImage ? "text-white opacity-70 group-hover:opacity-100" : isDarkMode ? "text-white/50" : "text-black/50"}`} />
-                          </div>
+                          {profileData.profileImage ? (
+                            <button
+                              type="button"
+                              onClick={editPersonalImage}
+                              title="Edit image"
+                              className="absolute inset-0 flex items-center justify-center cursor-pointer bg-black/0 hover:bg-black/40 transition-colors"
+                            >
+                              <Pencil className="w-7 h-7 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </button>
+                          ) : (
+                            <div
+                              {...getEditProfileRootProps()}
+                              className={`absolute inset-0 flex items-center justify-center cursor-pointer transition-colors ${
+                                isEditProfileDragActive
+                                  ? "bg-black/40"
+                                  : isDarkMode
+                                  ? "bg-white/5 hover:bg-white/10"
+                                  : "bg-black/5 hover:bg-black/10"
+                              }`}
+                            >
+                              <input {...getEditProfileInputProps()} />
+                              <Plus className={`w-8 h-8 ${isDarkMode ? "text-white/50" : "text-black/50"}`} />
+                            </div>
+                          )}
                           {profileImageUploading && <UploadSpinnerOverlay />}
                         </div>
                       </div>
@@ -1757,21 +1833,30 @@ export function EditProfile() {
                           {profileData.shopProfileImage && (
                             <img src={profileData.shopProfileImage} alt="Shop profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                           )}
-                          <div
-                            {...getShopProfileRootProps()}
-                            className={`absolute inset-0 flex items-center justify-center cursor-pointer transition-colors ${
-                              isShopProfileDragActive
-                                ? "bg-black/40"
-                                : profileData.shopProfileImage
-                                ? "bg-black/20 hover:bg-black/40"
-                                : isDarkMode
-                                ? "bg-white/5 hover:bg-white/10"
-                                : "bg-black/5 hover:bg-black/10"
-                            }`}
-                          >
-                            <input {...getShopProfileInputProps()} />
-                            <Plus className={`w-8 h-8 transition-opacity ${profileData.shopProfileImage ? "text-white opacity-70 group-hover:opacity-100" : isDarkMode ? "text-white/50" : "text-black/50"}`} />
-                          </div>
+                          {profileData.shopProfileImage ? (
+                            <button
+                              type="button"
+                              onClick={editShopProfileImage}
+                              title="Edit image"
+                              className="absolute inset-0 flex items-center justify-center cursor-pointer bg-black/0 hover:bg-black/40 transition-colors"
+                            >
+                              <Pencil className="w-7 h-7 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </button>
+                          ) : (
+                            <div
+                              {...getShopProfileRootProps()}
+                              className={`absolute inset-0 flex items-center justify-center cursor-pointer transition-colors ${
+                                isShopProfileDragActive
+                                  ? "bg-black/40"
+                                  : isDarkMode
+                                  ? "bg-white/5 hover:bg-white/10"
+                                  : "bg-black/5 hover:bg-black/10"
+                              }`}
+                            >
+                              <input {...getShopProfileInputProps()} />
+                              <Plus className={`w-8 h-8 ${isDarkMode ? "text-white/50" : "text-black/50"}`} />
+                            </div>
+                          )}
                           {shopProfileImageUploading && <UploadSpinnerOverlay />}
                         </div>
                       </div>
@@ -1780,33 +1865,37 @@ export function EditProfile() {
                     <div>
                       <label className={labelClass}>Cover image</label>
                       <div
-                        className={`relative w-full h-40 overflow-hidden group border-2 border-dashed ${isDarkMode ? "border-white/40 hover:border-white" : "border-black/40 hover:border-black"} transition-colors ${profileData.coverImage ? "cursor-pointer" : ""}`}
-                        onClick={profileData.coverImage ? () => setCoverPreviewOpen(true) : undefined}
+                        className={`relative w-full h-40 overflow-hidden group border-2 border-dashed ${isDarkMode ? "border-white/40 hover:border-white" : "border-black/40 hover:border-black"} transition-colors`}
                       >
                         {profileData.coverImage && (
                           <img src={profileData.coverImage} alt="Cover" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         )}
-                        <div
-                          {...getEditCoverRootProps()}
-                          className={`absolute inset-0 flex items-center justify-center transition-colors ${profileData.coverImage ? "" : "cursor-pointer"} ${
-                            isEditCoverDragActive
-                              ? "bg-black/40"
-                              : profileData.coverImage
-                              ? "bg-transparent group-hover:bg-black/30"
-                              : isDarkMode
-                              ? "bg-white/5 hover:bg-white/10"
-                              : "bg-black/5 hover:bg-black/10"
-                          }`}
-                        >
-                          <input {...getEditCoverInputProps()} />
-                          {!profileData.coverImage ? (
-                            <Plus className={`w-8 h-8 transition-opacity ${isDarkMode ? "text-white/50" : "text-black/50"}`} />
-                          ) : (
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                              Click to preview
+                        {profileData.coverImage ? (
+                          <button
+                            type="button"
+                            onClick={editCoverImage}
+                            title="Edit image"
+                            className="absolute inset-0 flex items-center justify-center cursor-pointer bg-transparent group-hover:bg-black/30 transition-colors"
+                          >
+                            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Pencil className="w-3.5 h-3.5" /> Edit
                             </span>
-                          )}
-                        </div>
+                          </button>
+                        ) : (
+                          <div
+                            {...getEditCoverRootProps()}
+                            className={`absolute inset-0 flex items-center justify-center cursor-pointer transition-colors ${
+                              isEditCoverDragActive
+                                ? "bg-black/40"
+                                : isDarkMode
+                                ? "bg-white/5 hover:bg-white/10"
+                                : "bg-black/5 hover:bg-black/10"
+                            }`}
+                          >
+                            <input {...getEditCoverInputProps()} />
+                            <Plus className={`w-8 h-8 ${isDarkMode ? "text-white/50" : "text-black/50"}`} />
+                          </div>
+                        )}
                         {coverUploadProgress !== null && <UploadProgressOverlay percent={coverUploadProgress} />}
                       </div>
                     </div>
@@ -2231,16 +2320,6 @@ export function EditProfile() {
           </form>
         </div>
       </main>
-
-      <CoverPreviewModal
-        open={coverPreviewOpen}
-        imageUrl={profileData.coverImage || null}
-        isDarkMode={isDarkMode}
-        onClose={() => setCoverPreviewOpen(false)}
-        onReplace={openCoverPicker}
-        onDelete={() => setProfileData((prev) => ({ ...prev, coverImage: CREATOR_DEFAULT_COVER }))}
-        isDefault={profileData.coverImage === CREATOR_DEFAULT_COVER}
-      />
     </div>
   );
 }
