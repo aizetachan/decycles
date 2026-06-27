@@ -68,3 +68,22 @@ export interface Follow {
   followeeType: FolloweeType;
   createdAt?: any;
 }
+
+/** Who authored a post — a creator/shop or a regular user. */
+export type AuthorType = "creator" | "user";
+
+/**
+ * A wall/feed post. Author name & image are denormalized so the feed renders
+ * without an extra read per post. likesCount is maintained by a trigger.
+ */
+export interface Post {
+  id: string;
+  authorId: string;
+  authorType: AuthorType;
+  authorName: string;
+  authorImage?: string;
+  text: string;
+  imageUrl?: string;
+  createdAt?: any;
+  likesCount?: number;
+}

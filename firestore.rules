@@ -63,6 +63,18 @@ service cloud.firestore {
         && resource.data.userId == request.auth.uid;
     }
 
+    // Posts — wall/feed content authored by a creator (shop) or a user.
+    // authorId must be the signed-in user on create; only the author can
+    // edit/delete. Public read (the feed). likesCount is maintained by a
+    // trigger (admin SDK), so client writes never set it directly.
+    match /posts/{postId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.authorId == request.auth.uid;
+      allow update, delete: if isSignedIn()
+        && resource.data.authorId == request.auth.uid;
+    }
+
     // Follows — one document per (follower, followee). Doc id is
     // `{followerId}_{followeeId}`. followerId is always the signed-in user;
     // followeeType ("creator" | "user") records WHAT is followed so triggers

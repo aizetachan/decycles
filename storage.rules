@@ -32,5 +32,13 @@ service firebase.storage {
       allow write: if isAdmin()
         || (isSignedIn() && request.auth.uid == userId);
     }
+
+    // Post images live under posts/{uid}/... — kept separate from profile
+    // images so the profile-image cleanup triggers never touch them. The
+    // author (or an admin) can write there.
+    match /posts/{userId}/{allPaths=**} {
+      allow write: if isAdmin()
+        || (isSignedIn() && request.auth.uid == userId);
+    }
   }
 }

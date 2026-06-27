@@ -7,6 +7,7 @@ import { ResetPassword } from "./pages/ResetPassword";
 import { EventPage } from "./pages/EventPage";
 import { Favorites } from "./pages/Favorites";
 import { MyEvents } from "./pages/MyEvents";
+import { Feed } from "./pages/Feed";
 
 // Admin
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
@@ -101,6 +102,7 @@ export default function App() {
         <Route path="/creator/:id" element={<CreatorDeepLinkRedirect />} />
         <Route path="/profile/edit" element={<EditProfile />} />
         <Route path="/favorites" element={<Favorites />} />
+        <Route path="/feed" element={<Feed />} />
         <Route path="/my-events" element={<MyEvents />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
