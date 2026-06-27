@@ -7,11 +7,12 @@ import { db } from '../../firebase';
 import { useUI } from '../../contexts/UIContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Creator, Category, SubCategory } from '../../types';
-import { Save, ArrowLeft, Plus, Trash2, Upload, MapPin, Loader2, ChevronDown, ChevronUp, Search, X, Calendar as CalIcon } from 'lucide-react';
+import { Save, ArrowLeft, Plus, Trash2, Upload, MapPin, Loader2, ChevronDown, ChevronUp, Search, X, Calendar as CalIcon, Pencil } from 'lucide-react';
 import { DatePicker } from '../../components/ui/DatePicker';
 import { uploadImage, stripUndefined, normalizeUrl } from '../../lib/upload';
+import { useCropper } from '../../components/ui/ImageCropperProvider';
+import type { CropOptions } from '../../components/ui/ImageCropModal';
 import { CREATOR_DEFAULT_AVATAR, CREATOR_DEFAULT_COVER } from '../../lib/defaultAvatars';
-import { CoverPreviewModal } from '../../components/modals/CoverPreviewModal';
 import { GalleryManager } from '../../components/ui/GalleryManager';
 import { geocodeAddress } from '../../lib/geocode';
 import { EVENT_CATEGORIES } from '../../constants/categories';
@@ -26,6 +27,8 @@ interface ImageFieldProps {
   // 'progress' shows a 0..100 bar (cover/gallery). 'spinner' shows an indeterminate
   // loader (profile avatar — typically too small/fast for a meaningful bar).
   variant?: 'progress' | 'spinner';
+  // When set, a crop modal (to this aspect ratio) opens before upload.
+  crop?: CropOptions;
   // Optional hook fired after a successful upload (not after manual URL edits).
   // Used to e.g. open a preview modal after the cover is uploaded.
   onAfterUpload?: (url: string) => void;
@@ -43,25 +46,25 @@ export interface ImageFieldHandle {
 }
 
 const ImageField = forwardRef<ImageFieldHandle, ImageFieldProps>(function ImageField(
-  { label, value, onChange, folder, isDarkMode, variant = 'progress', onAfterUpload, onImageClick },
+  { label, value, onChange, folder, isDarkMode, variant = 'progress', crop, onAfterUpload, onImageClick },
   ref,
 ) {
   const [progress, setProgress] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const cropImage = useCropper();
   // Snapshot of the URL when the manual text input got focus. Used to detect
   // whether the user actually pasted/edited a NEW URL (vs. just clicking in
   // and out without changes), so we don't spam onAfterUpload.
   const urlOnFocusRef = useRef<string>('');
 
-  const onDrop = async (files: File[]) => {
-    if (!files.length) return;
+  const uploadFile = async (file: File) => {
     setError(null);
     setUploading(true);
     if (variant === 'progress') setProgress(0);
     try {
       const url = await uploadImage(
-        files[0],
+        file,
         folder,
         variant === 'progress' ? (pct) => setProgress(pct) : undefined,
       );
@@ -74,6 +77,23 @@ const ImageField = forwardRef<ImageFieldHandle, ImageFieldProps>(function ImageF
       setUploading(false);
       setProgress(null);
     }
+  };
+
+  const onDrop = async (files: File[]) => {
+    if (!files.length) return;
+    let file: File | null = files[0];
+    if (crop) {
+      file = await cropImage(files[0], crop);
+      if (!file) return; // cancelled
+    }
+    await uploadFile(file);
+  };
+
+  // Click the existing image to re-crop it (or Replace inside the modal).
+  const editExisting = async () => {
+    if (!value || !crop) return;
+    const cropped = await cropImage(value, crop);
+    if (cropped) await uploadFile(cropped);
   };
 
   const { getRootProps, getInputProps, isDragActive, open: openPicker } = useDropzone({
@@ -93,14 +113,24 @@ const ImageField = forwardRef<ImageFieldHandle, ImageFieldProps>(function ImageF
     <div className="space-y-2">
       <label className={labelClass}>{label}</label>
       {value && (
-        <div className="relative">
+        <div className="relative group">
           <img
             src={value}
             alt=""
-            className={`w-full h-32 object-cover border-2 border-current/20 ${onImageClick ? 'cursor-pointer' : ''}`}
-            onClick={onImageClick}
+            className={`w-full h-32 object-cover border-2 border-current/20 ${crop || onImageClick ? 'cursor-pointer' : ''}`}
+            onClick={crop ? editExisting : onImageClick}
             referrerPolicy="no-referrer"
           />
+          {crop && (
+            <div
+              onClick={editExisting}
+              className="absolute inset-0 flex items-center justify-center bg-transparent group-hover:bg-black/30 transition-colors cursor-pointer"
+            >
+              <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                <Pencil className="w-3.5 h-3.5" /> Edit
+              </span>
+            </div>
+          )}
           {uploading && variant === 'spinner' && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/60">
               <Loader2 className="w-8 h-8 text-white animate-spin" />
@@ -304,7 +334,6 @@ export function AdminCreatorEdit() {
   const [expandedEventIdx, setExpandedEventIdx] = useState<number | null>(null);
   const [geocoding, setGeocoding] = useState(false);
   const [geocodeMessage, setGeocodeMessage] = useState<string | null>(null);
-  const [coverPreviewOpen, setCoverPreviewOpen] = useState(false);
 
   // Linked user account for the USER sub-tab. Populated when the shop's id
   // matches a users/{uid} doc — admin can edit firstName, lastName, bio,
@@ -808,6 +837,7 @@ export function AdminCreatorEdit() {
                     folder={`users/${id || 'new'}/avatar`}
                     isDarkMode={isDarkMode}
                     variant="spinner"
+                    crop={{ aspect: 1, cropShape: 'round', title: 'Crop avatar', minWidth: 256 }}
                   />
                   <div className="grid grid-cols-1 gap-4">
                     <div className="space-y-2">
@@ -955,6 +985,7 @@ export function AdminCreatorEdit() {
                 folder={`creators/${id || 'new'}/avatar`}
                 isDarkMode={isDarkMode}
                 variant="spinner"
+                crop={{ aspect: 1, cropShape: 'round', title: 'Crop logo', minWidth: 256 }}
               />
               <ImageField
                 ref={coverFieldRef}
@@ -963,8 +994,7 @@ export function AdminCreatorEdit() {
                 onChange={(url) => setFormData(prev => ({ ...prev, coverImage: url }))}
                 folder={`creators/${id || 'new'}/cover`}
                 isDarkMode={isDarkMode}
-                onAfterUpload={() => setCoverPreviewOpen(true)}
-                onImageClick={() => setCoverPreviewOpen(true)}
+                crop={{ aspect: 16 / 9, safeZoneWidthPct: 75, title: 'Crop cover', safeZoneLabel: 'Visible on cards', minWidth: 800 }}
               />
             </div>
           </>
@@ -1530,6 +1560,7 @@ export function AdminCreatorEdit() {
                               onChange={(url) => updateEvent(idx, { coverImage: url })}
                               folder={`creators/${id || 'new'}/events/${idx}`}
                               isDarkMode={isDarkMode}
+                              crop={{ aspect: 16 / 9, safeZoneWidthPct: 75, title: 'Crop cover', safeZoneLabel: 'Visible on cards', minWidth: 800 }}
                             />
                             <div>
                               <label className={`block text-[10px] font-bold uppercase tracking-widest mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
@@ -1554,16 +1585,6 @@ export function AdminCreatorEdit() {
           );
         })()}
       </div>
-
-      <CoverPreviewModal
-        open={coverPreviewOpen}
-        imageUrl={formData.coverImage || null}
-        isDarkMode={isDarkMode}
-        onClose={() => setCoverPreviewOpen(false)}
-        onReplace={() => coverFieldRef.current?.openPicker()}
-        onDelete={() => setFormData(prev => ({ ...prev, coverImage: CREATOR_DEFAULT_COVER }))}
-        isDefault={formData.coverImage === CREATOR_DEFAULT_COVER}
-      />
     </div>
   );
 }

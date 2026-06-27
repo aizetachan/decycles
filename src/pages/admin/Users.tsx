@@ -6,7 +6,8 @@ import { db, functions } from '../../firebase';
 import { useUI } from '../../contexts/UIContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { uploadImage } from '../../lib/upload';
-import { Shield, User, ShieldAlert, Search, X, Trash2, Ban, Loader2, Plus, UserX, AlertTriangle, RefreshCw } from 'lucide-react';
+import { useCropper } from '../../components/ui/ImageCropperProvider';
+import { Shield, User, ShieldAlert, Search, X, Trash2, Ban, Loader2, Plus, UserX, AlertTriangle, RefreshCw, Pencil } from 'lucide-react';
 
 type Role = 'user' | 'creator' | 'admin';
 
@@ -103,13 +104,15 @@ export function Users() {
 
   // The admin's own row — block/delete on yourself is disabled to avoid lockout.
   const isSelf = !!editing && !!currentUser && editing.id === currentUser.uid;
+  const cropImage = useCropper();
 
-  const onAvatarDrop = async (files: File[]) => {
-    if (!files.length || !editing) return;
+  const AVATAR_CROP = { aspect: 1, cropShape: 'round' as const, title: 'Crop avatar', minWidth: 256 };
+  const uploadAvatar = async (file: File) => {
+    if (!editing) return;
     setSaveError(null);
     setAvatarUploading(true);
     try {
-      const url = await uploadImage(files[0], `users/${editing.id}/avatar`);
+      const url = await uploadImage(file, `users/${editing.id}/avatar`);
       setDraftProfileImage(url);
     } catch (err: any) {
       console.error(err);
@@ -117,6 +120,16 @@ export function Users() {
     } finally {
       setAvatarUploading(false);
     }
+  };
+  const onAvatarDrop = async (files: File[]) => {
+    if (!files.length || !editing) return;
+    const cropped = await cropImage(files[0], AVATAR_CROP);
+    if (cropped) await uploadAvatar(cropped);
+  };
+  const editAvatar = async () => {
+    if (!draftProfileImage) return;
+    const cropped = await cropImage(draftProfileImage, AVATAR_CROP);
+    if (cropped) await uploadAvatar(cropped);
   };
   const { getRootProps: getAvatarRootProps, getInputProps: getAvatarInputProps, isDragActive: isAvatarDragActive } =
     useDropzone({ onDrop: onAvatarDrop, accept: { 'image/*': [] }, maxFiles: 1 } as any);
@@ -399,8 +412,17 @@ export function Users() {
                       <User className="w-6 h-6 text-gray-500" />
                     </div>
                   )}
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {avatarUploading ? <Loader2 className="w-5 h-5 text-white animate-spin" /> : <Plus className="w-5 h-5 text-white" />}
+                  <div
+                    className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={draftProfileImage && !avatarUploading ? (e) => { e.stopPropagation(); editAvatar(); } : undefined}
+                  >
+                    {avatarUploading ? (
+                      <Loader2 className="w-5 h-5 text-white animate-spin" />
+                    ) : draftProfileImage ? (
+                      <Pencil className="w-5 h-5 text-white" />
+                    ) : (
+                      <Plus className="w-5 h-5 text-white" />
+                    )}
                   </div>
                 </div>
                 <div className={`text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
