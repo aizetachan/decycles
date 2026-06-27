@@ -62,5 +62,20 @@ service cloud.firestore {
       allow update, delete: if isSignedIn()
         && resource.data.userId == request.auth.uid;
     }
+
+    // Follows — one document per (follower, followee). Doc id is
+    // `{followerId}_{followeeId}`. followerId is always the signed-in user;
+    // followeeType ("creator" | "user") records WHAT is followed so triggers
+    // and queries know which collection it belongs to (it is NOT a
+    // "followed-or-not" flag — that's just whether this doc exists). Public
+    // read (follower counts / "following" lists); only the follower may
+    // create/delete their own follow. No update — a follow only exists or not.
+    match /follows/{followId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.followerId == request.auth.uid;
+      allow delete: if isSignedIn()
+        && resource.data.followerId == request.auth.uid;
+    }
   }
 }

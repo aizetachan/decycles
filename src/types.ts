@@ -50,4 +50,21 @@ export interface Creator {
   isPublished?: boolean;
   events?: any[];
   filters?: string[];
+  /** Cached follower count, maintained by the syncFollowCounts function. */
+  followersCount?: number;
+}
+
+/** What kind of entity is being followed (selects the target collection). */
+export type FolloweeType = "creator" | "user";
+
+/**
+ * A follow relationship. Doc id is `{followerId}_{followeeId}`. Whether someone
+ * is followed is answered by this doc's existence — `followeeType` only records
+ * WHAT is followed (a creator/shop or a user) so we know which collection it is.
+ */
+export interface Follow {
+  followerId: string;
+  followeeId: string;
+  followeeType: FolloweeType;
+  createdAt?: any;
 }

@@ -13,7 +13,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions/v2");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
-const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getStorage } = require("firebase-admin/storage");
 
 initializeApp();
@@ -157,6 +157,43 @@ exports.cleanupUserImages = onDocumentWritten(
       event.data?.after?.data(),
       "cleanupUserImages",
     );
+  },
+);
+
+// Keep follower/following counts in sync as follows/{id} docs are created and
+// deleted. followerId is always a user; followeeType ("creator" | "user") says
+// which collection the followee lives in, so we bump the right counter. Cached
+// counts avoid a count query on every profile/feed render.
+exports.syncFollowCounts = onDocumentWritten(
+  { document: "follows/{followId}", region: "us-central1" },
+  async (event) => {
+    const had = event.data?.before?.exists;
+    const has = event.data?.after?.exists;
+    let delta = 0;
+    if (!had && has) delta = 1;       // created
+    else if (had && !has) delta = -1; // deleted
+    else return;                       // no-op rewrite
+
+    const data = (has ? event.data.after.data() : event.data.before.data()) || {};
+    const { followerId, followeeId, followeeType } = data;
+    if (!followerId || !followeeId || !followeeType) return;
+
+    const db = getFirestore();
+    const followeeCol = followeeType === "creator" ? "creators" : "users";
+    try {
+      await Promise.all([
+        db.doc(`users/${followerId}`).set(
+          { followingCount: FieldValue.increment(delta) },
+          { merge: true },
+        ),
+        db.doc(`${followeeCol}/${followeeId}`).set(
+          { followersCount: FieldValue.increment(delta) },
+          { merge: true },
+        ),
+      ]);
+    } catch (err) {
+      logger.error(`[syncFollowCounts] failed for ${event.params.followId}:`, err);
+    }
   },
 );
 
