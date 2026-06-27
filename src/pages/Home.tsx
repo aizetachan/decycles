@@ -23,6 +23,7 @@ import { CreatorMap } from "../components/home/CreatorMap";
 import { EventCalendar } from "../components/home/EventCalendar";
 import { Category, SubCategory, Creator } from "../types";
 import { useCreators } from "../hooks/useCreators";
+import { orderCreators } from "../lib/creatorOrdering";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -37,6 +38,12 @@ L.Icon.Default.mergeOptions({
 
 type FilterGroup = { groupName: string; options: SubCategory[] };
 type FilterItem = SubCategory | FilterGroup;
+
+// Creators forced to the front of the home gallery, in this order. Empty by
+// default (pure random ordering). Future: feed this from an admin/config doc to
+// pin featured shops in the first positions. Module-level so its reference stays
+// stable across renders (safe as a useMemo dependency).
+const FEATURED_CREATOR_IDS: string[] = [];
 
 const getViews = (creator: Creator) => {
   if (creator.views !== undefined) return creator.views;
@@ -227,8 +234,20 @@ export function Home() {
   const [featuredTab, setFeaturedTab] = useState<"EXPLORE" | "GALLERY" | "CALENDAR">(initialTab);
   const [calendarDate, setCalendarDate] = useState(new Date());
 
+  // One fresh random seed per page load → the gallery shows a new creator order
+  // each visit, but stays stable across re-renders / live updates within the
+  // session (no reshuffling when a creator doc changes).
+  const [orderSeed] = useState(() => Math.floor(Math.random() * 2 ** 31));
+
   const allCreators = useMemo(() => {
-    const list = [...creators].filter(c => c.isPublished !== false);
+    const published = [...creators].filter((c) => c.isPublished !== false);
+    // Default home ordering: random per load, with featured ids pinned to the
+    // front (none for now). Later, feed config-driven mode/pinnedIds here.
+    const list = orderCreators(published, {
+      mode: "random",
+      pinnedIds: FEATURED_CREATOR_IDS,
+      seed: orderSeed,
+    });
     if (profileData.isPublished) {
       list.unshift({
         id: "current-user",
@@ -250,7 +269,7 @@ export function Home() {
       });
     }
     return list;
-  }, [profileData, creators]);
+  }, [profileData, creators, orderSeed]);
 
   // Extract unique countries from creators
   const countries = useMemo(() => {
