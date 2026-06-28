@@ -197,6 +197,34 @@ exports.syncFollowCounts = onDocumentWritten(
   },
 );
 
+// Keep likesCount in sync as likes/{id} docs are created and deleted. The
+// targetType ("post" | "creator" | "user") selects which collection's doc to
+// bump, so the same store powers post likes and shop/profile likes.
+exports.syncLikeCounts = onDocumentWritten(
+  { document: "likes/{likeId}", region: "us-central1" },
+  async (event) => {
+    const had = event.data?.before?.exists;
+    const has = event.data?.after?.exists;
+    let delta = 0;
+    if (!had && has) delta = 1;
+    else if (had && !has) delta = -1;
+    else return;
+
+    const data = (has ? event.data.after.data() : event.data.before.data()) || {};
+    const { targetType, targetId } = data;
+    if (!targetType || !targetId) return;
+
+    const col = targetType === "post" ? "posts" : targetType === "creator" ? "creators" : "users";
+    try {
+      await getFirestore()
+        .doc(`${col}/${targetId}`)
+        .set({ likesCount: FieldValue.increment(delta) }, { merge: true });
+    } catch (err) {
+      logger.error(`[syncLikeCounts] failed for ${event.params.likeId}:`, err);
+    }
+  },
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Admin user management — operations that need the Admin SDK and therefore
 // can't run from the client: changing another user's real login email, and

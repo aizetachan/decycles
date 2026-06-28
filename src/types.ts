@@ -69,8 +69,26 @@ export interface Follow {
   createdAt?: any;
 }
 
+/** What a ♥ like can target. */
+export type LikeTargetType = "post" | "creator" | "user";
+
+/** A ♥ like. Doc id is `{userId}_{targetType}_{targetId}`. */
+export interface Like {
+  userId: string;
+  targetType: LikeTargetType;
+  targetId: string;
+  createdAt?: any;
+}
+
 /** Who authored a post — a creator/shop or a regular user. */
 export type AuthorType = "creator" | "user";
+
+/** A creator/user tagged in a post via @mention. */
+export interface PostMention {
+  type: "creator" | "user";
+  id: string;
+  name: string;
+}
 
 /**
  * A wall/feed post. Author name & image are denormalized so the feed renders
@@ -86,6 +104,7 @@ export interface Post {
   /** @deprecated single-image legacy field — use imageUrls. */
   imageUrl?: string;
   imageUrls?: string[];
+  mentions?: PostMention[];
   createdAt?: any;
   likesCount?: number;
 }

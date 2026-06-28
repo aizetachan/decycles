@@ -3,33 +3,25 @@ import { ImagePlus, X, Loader2 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { createPost } from "../../lib/posts";
 import { ImageLightbox } from "./ImageLightbox";
+import { MentionInput } from "./MentionInput";
+import type { PostMention } from "../../types";
 
 const MAX_IMAGES = 5;
 
 /**
- * Inline composer at the top of the feed. Text + up to 5 images. Posts as the
- * signed-in account (a creator posts as their shop — see createPost).
+ * Inline composer at the top of the feed. Rich text (with @mentions) + up to 5
+ * images. Posts as the signed-in account (a creator posts as their shop).
  */
 export function PostComposer({ isDarkMode, onPosted }: { isDarkMode: boolean; onPosted?: () => void }) {
   const { currentUser, userProfile } = useAuth();
   const [text, setText] = useState("");
+  const [mentions, setMentions] = useState<PostMention[]>([]);
+  const [resetKey, setResetKey] = useState(0);
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [lightbox, setLightbox] = useState(-1);
   const [posting, setPosting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const textRef = useRef<HTMLTextAreaElement>(null);
-
-  // Grow from a single-line input into a textarea as the text expands.
-  const autoGrow = () => {
-    const el = textRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
-  };
-  const resetGrow = () => {
-    if (textRef.current) textRef.current.style.height = "auto";
-  };
 
   if (!currentUser) return null;
 
@@ -37,8 +29,7 @@ export function PostComposer({ isDarkMode, onPosted }: { isDarkMode: boolean; on
     const picked = Array.from<File>(e.target.files || []).filter((f) => f.type.startsWith("image/"));
     e.target.value = "";
     if (!picked.length) return;
-    const room = MAX_IMAGES - files.length;
-    const next = picked.slice(0, room);
+    const next = picked.slice(0, MAX_IMAGES - files.length);
     setFiles((prev) => [...prev, ...next]);
     setPreviews((prev) => [...prev, ...next.map((f) => URL.createObjectURL(f))]);
   };
@@ -66,9 +57,11 @@ export function PostComposer({ isDarkMode, onPosted }: { isDarkMode: boolean; on
         userImage: (userProfile as any)?.profileImage,
         text,
         imageFiles: files,
+        mentions,
       });
       setText("");
-      resetGrow();
+      setMentions([]);
+      setResetKey((k) => k + 1);
       clearImages();
       onPosted?.();
     } catch (err) {
@@ -80,20 +73,14 @@ export function PostComposer({ isDarkMode, onPosted }: { isDarkMode: boolean; on
 
   return (
     <div className={`brutalist-border brutalist-shadow p-4 ${isDarkMode ? "bg-zinc-900 border-zinc-700" : "bg-white"}`}>
-      <textarea
-        ref={textRef}
-        value={text}
-        onChange={(e) => {
-          setText(e.target.value);
-          autoGrow();
+      <MentionInput
+        isDarkMode={isDarkMode}
+        placeholder="What's new? Share an update, a new drop or an event… Use @ to tag."
+        resetKey={resetKey}
+        onChange={(t, m) => {
+          setText(t);
+          setMentions(m);
         }}
-        placeholder="What's new? Share an update, a new drop or an event…"
-        rows={1}
-        className={`w-full resize-none overflow-hidden p-3 border-2 outline-none text-sm md:text-base transition-colors ${
-          isDarkMode
-            ? "bg-black border-zinc-700 text-white placeholder-gray-500 focus:border-white"
-            : "bg-gray-50 border-gray-300 text-black placeholder-gray-400 focus:border-black"
-        }`}
       />
 
       <div className={`mt-3 flex items-center gap-2 border-t pt-3 ${isDarkMode ? "border-white/10" : "border-black/10"}`}>

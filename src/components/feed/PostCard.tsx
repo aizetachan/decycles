@@ -1,8 +1,45 @@
-import { useState, type FC } from "react";
+import { useState, type FC, type ReactNode } from "react";
 import { Heart, MessageCircle } from "lucide-react";
 import { useUI } from "../../contexts/UIContext";
+import { useLike } from "../../hooks/useLike";
 import { ImageLightbox } from "./ImageLightbox";
-import type { Post } from "../../types";
+import type { Post, PostMention } from "../../types";
+
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Render post text with @mentions turned into clickable links. */
+function renderText(
+  text: string,
+  mentions: PostMention[] | undefined,
+  onMention: (m: PostMention) => void,
+  isDarkMode: boolean,
+): ReactNode {
+  if (!mentions?.length) return text;
+  const byLength = [...mentions].sort((a, b) => b.name.length - a.name.length);
+  const pattern = new RegExp("@(" + byLength.map((m) => escapeRegex(m.name)).join("|") + ")", "g");
+  const out: ReactNode[] = [];
+  let last = 0;
+  let key = 0;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > last) out.push(text.slice(last, match.index));
+    const name = match[1];
+    const mention = mentions.find((m) => m.name === name);
+    out.push(
+      <button
+        key={`m${key++}`}
+        type="button"
+        onClick={() => mention && onMention(mention)}
+        className={`font-extrabold underline decoration-1 underline-offset-2 ${isDarkMode ? "text-white" : "text-black"}`}
+      >
+        @{name}
+      </button>,
+    );
+    last = pattern.lastIndex;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
 
 function timeAgo(ts: any): string {
   const d = ts?.toDate ? ts.toDate() : ts ? new Date(ts) : null;
@@ -22,13 +59,18 @@ function timeAgo(ts: any): string {
 
 export const PostCard: FC<{ post: Post; isDarkMode: boolean }> = ({ post, isDarkMode }) => {
   const { openCreatorProfile } = useUI();
-  // Local-only like for now (visual). Wired to the likes store in the next slice.
-  const [liked, setLiked] = useState(false);
   const [lightbox, setLightbox] = useState(-1);
-  const likeCount = (post.likesCount || 0) + (liked ? 1 : 0);
+  // Real likes for live posts; mock posts (no backend) fall back to a local toggle.
+  const isMock = post.id.startsWith("mock-");
+  const { isLiked, toggleLike } = useLike("post", isMock ? undefined : post.id);
+  const likeCount = (post.likesCount || 0) + (isLiked ? 1 : 0);
   const images = post.imageUrls?.length ? post.imageUrls : post.imageUrl ? [post.imageUrl] : [];
   const goAuthor = () => {
     if (post.authorType === "creator") openCreatorProfile(post.authorId);
+  };
+  const onMention = (m: PostMention) => {
+    if (m.type === "creator") openCreatorProfile(m.id);
+    // user mentions: no public profile yet — styled link, no navigation.
   };
 
   return (
@@ -56,7 +98,7 @@ export const PostCard: FC<{ post: Post; isDarkMode: boolean }> = ({ post, isDark
 
       {post.text && (
         <p className={`mt-3 whitespace-pre-wrap break-words ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>
-          {post.text}
+          {renderText(post.text, post.mentions, onMention, isDarkMode)}
         </p>
       )}
 
@@ -80,11 +122,11 @@ export const PostCard: FC<{ post: Post; isDarkMode: boolean }> = ({ post, isDark
       <footer className={`mt-4 flex items-center gap-5 text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
         <button
           type="button"
-          onClick={() => setLiked((v) => !v)}
-          aria-pressed={liked}
+          onClick={() => toggleLike()}
+          aria-pressed={isLiked}
           className={`flex items-center gap-1.5 transition-colors ${isDarkMode ? "hover:text-white" : "hover:text-black"}`}
         >
-          <Heart className={`w-4 h-4 ${liked ? "fill-current text-red-500" : ""}`} />
+          <Heart className={`w-4 h-4 ${isLiked ? "fill-current text-red-500" : ""}`} />
           {likeCount}
         </button>
         <span className="flex items-center gap-1.5">

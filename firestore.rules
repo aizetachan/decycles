@@ -89,5 +89,17 @@ service cloud.firestore {
       allow delete: if isSignedIn()
         && resource.data.followerId == request.auth.uid;
     }
+
+    // Likes (the ♥). One doc per (user, target). Doc id is
+    // `{userId}_{targetType}_{targetId}`. targetType ("post" | "creator" |
+    // "user") selects the collection whose likesCount a trigger maintains.
+    // Public read (counts); only the liker can create/delete their own like.
+    match /likes/{likeId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+    }
   }
 }

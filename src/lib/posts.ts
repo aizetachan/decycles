@@ -1,7 +1,7 @@
 import { collection, addDoc, doc, getDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { uploadImage } from "./upload";
-import type { AuthorType } from "../types";
+import type { AuthorType, PostMention } from "../types";
 
 export interface CreatePostInput {
   uid: string;
@@ -11,6 +11,7 @@ export interface CreatePostInput {
   userImage?: string;
   text: string;
   imageFiles?: File[];
+  mentions?: PostMention[];
 }
 
 /**
@@ -20,9 +21,11 @@ export interface CreatePostInput {
  * An optional image is uploaded under posts/{uid}/ (compressed by uploadImage).
  */
 export async function createPost(input: CreatePostInput): Promise<void> {
-  const { uid, role, userName, userImage, text, imageFiles = [] } = input;
+  const { uid, role, userName, userImage, text, imageFiles = [], mentions = [] } = input;
   const body = text.trim();
   if (!body && imageFiles.length === 0) return; // nothing to post
+  // Keep only mentions whose @name still appears in the final text.
+  const activeMentions = mentions.filter((m) => body.includes(`@${m.name}`));
 
   let authorType: AuthorType = "user";
   let authorName = userName || "User";
@@ -54,6 +57,7 @@ export async function createPost(input: CreatePostInput): Promise<void> {
     authorImage: authorImage || null,
     text: body,
     ...(imageUrls.length ? { imageUrls } : {}),
+    ...(activeMentions.length ? { mentions: activeMentions } : {}),
     createdAt: serverTimestamp(),
     likesCount: 0,
   });
