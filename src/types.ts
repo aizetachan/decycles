@@ -90,6 +90,20 @@ export interface PostMention {
   name: string;
 }
 
+export type NotificationType = "follow" | "like" | "mention";
+
+/** In-app notification, stored at users/{uid}/notifications/{id}. */
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  actorId: string;
+  actorName: string;
+  actorImage?: string | null;
+  postId?: string;
+  read?: boolean;
+  createdAt?: any;
+}
+
 /**
  * A wall/feed post. Author name & image are denormalized so the feed renders
  * without an extra read per post. likesCount is maintained by a trigger.

@@ -6,6 +6,7 @@ import { useUI } from '../../contexts/UIContext';
 import { useT } from '../../contexts/LanguageContext';
 import { Creator } from '../../types';
 import { Link, useNavigate } from 'react-router-dom';
+import { NotificationBell } from './NotificationBell';
 
 interface HeaderProps {
   profileData: any;
@@ -124,6 +125,9 @@ export const Header: React.FC<HeaderProps> = ({ profileData, setSelectedCreator 
             <span className={`hidden md:block text-sm font-bold uppercase tracking-widest ${isDarkMode ? "text-white" : "text-black"}`}>
               {shortDisplayName}
             </span>
+          )}
+          {!authLoading && loggedInUser && (
+            <NotificationBell isDarkMode={isDarkMode} />
           )}
           {!authLoading && !loggedInUser && (
             <button

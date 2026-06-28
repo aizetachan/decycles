@@ -22,6 +22,7 @@ import { FiltersAdmin } from "./pages/admin/FiltersAdmin";
 import { JoinModal } from "./components/modals/JoinModal";
 import { CreatorProfileModal } from "./components/modals/CreatorProfileModal";
 import { EventModal } from "./components/modals/EventModal";
+import { PostModal } from "./components/modals/PostModal";
 import { useUI } from "./contexts/UIContext";
 import { CookieBanner } from "./components/layout/CookieBanner";
 import { useAuth } from "./contexts/AuthContext";
@@ -124,6 +125,7 @@ export default function App() {
       />
       <CreatorProfileModal />
       <EventModal />
+      <PostModal />
       <CookieBanner />
     </>
   );

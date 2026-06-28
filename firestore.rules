@@ -23,6 +23,13 @@ service cloud.firestore {
       allow update: if isAdmin()
         || (isSignedIn() && request.auth.uid == userId);
       allow delete: if isAdmin();
+
+      // Private per-user notifications. Written only by Cloud Functions (admin
+      // SDK bypasses rules); the owner can read them and mark them read/delete.
+      match /notifications/{notifId} {
+        allow read, update, delete: if isSignedIn() && request.auth.uid == userId;
+        allow create: if false;
+      }
     }
 
     match /creators/{creatorId} {

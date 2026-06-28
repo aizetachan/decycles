@@ -8,7 +8,7 @@
 const fs = require("fs");
 const path = require("path");
 const functions = require("firebase-functions/v1");
-const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { onDocumentWritten, onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions/v2");
 const { initializeApp } = require("firebase-admin/app");
@@ -160,10 +160,26 @@ exports.cleanupUserImages = onDocumentWritten(
   },
 );
 
+// Add an in-app notification to users/{recipientId}/notifications. Never
+// notifies someone about their own action.
+async function notify(db, recipientId, actorId, payload) {
+  if (!recipientId || recipientId === actorId) return;
+  try {
+    await db.collection(`users/${recipientId}/notifications`).add({
+      ...payload,
+      actorId,
+      read: false,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    logger.error(`[notify] failed for ${recipientId}:`, err);
+  }
+}
+
 // Keep follower/following counts in sync as follows/{id} docs are created and
-// deleted. followerId is always a user; followeeType ("creator" | "user") says
-// which collection the followee lives in, so we bump the right counter. Cached
-// counts avoid a count query on every profile/feed render.
+// deleted, and notify the followee on a new follow. followerId is always a
+// user; followeeType ("creator" | "user") says which collection the followee
+// lives in (its id is also the owner's uid).
 exports.syncFollowCounts = onDocumentWritten(
   { document: "follows/{followId}", region: "us-central1" },
   async (event) => {
@@ -194,6 +210,16 @@ exports.syncFollowCounts = onDocumentWritten(
     } catch (err) {
       logger.error(`[syncFollowCounts] failed for ${event.params.followId}:`, err);
     }
+
+    if (delta === 1) {
+      const followerSnap = await db.doc(`users/${followerId}`).get().catch(() => null);
+      const f = (followerSnap && followerSnap.data()) || {};
+      await notify(db, followeeId, followerId, {
+        type: "follow",
+        actorName: f.name || "Someone",
+        actorImage: f.profileImage || null,
+      });
+    }
   },
 );
 
@@ -214,14 +240,53 @@ exports.syncLikeCounts = onDocumentWritten(
     const { targetType, targetId } = data;
     if (!targetType || !targetId) return;
 
+    const db = getFirestore();
     const col = targetType === "post" ? "posts" : targetType === "creator" ? "creators" : "users";
     try {
-      await getFirestore()
-        .doc(`${col}/${targetId}`)
-        .set({ likesCount: FieldValue.increment(delta) }, { merge: true });
+      await db.doc(`${col}/${targetId}`).set({ likesCount: FieldValue.increment(delta) }, { merge: true });
     } catch (err) {
       logger.error(`[syncLikeCounts] failed for ${event.params.likeId}:`, err);
     }
+
+    // Notify the post author on a new like.
+    if (delta === 1 && targetType === "post") {
+      const postSnap = await db.doc(`posts/${targetId}`).get().catch(() => null);
+      const post = postSnap && postSnap.data();
+      if (post && post.authorId) {
+        const likerSnap = await db.doc(`users/${data.userId}`).get().catch(() => null);
+        const liker = (likerSnap && likerSnap.data()) || {};
+        await notify(db, post.authorId, data.userId, {
+          type: "like",
+          actorName: liker.name || "Someone",
+          actorImage: liker.profileImage || null,
+          postId: targetId,
+        });
+      }
+    }
+  },
+);
+
+// Notify each tagged creator/user when a post mentioning them is created. The
+// mention id is the target's uid (a creator's id is also its owner's uid).
+exports.notifyMentions = onDocumentCreated(
+  { document: "posts/{postId}", region: "us-central1" },
+  async (event) => {
+    const post = event.data && event.data.data();
+    if (!post || !Array.isArray(post.mentions) || post.mentions.length === 0) return;
+    const db = getFirestore();
+    const seen = new Set();
+    await Promise.all(
+      post.mentions.map((m) => {
+        if (!m || !m.id || seen.has(m.id)) return null;
+        seen.add(m.id);
+        return notify(db, m.id, post.authorId, {
+          type: "mention",
+          actorName: post.authorName || "Someone",
+          actorImage: post.authorImage || null,
+          postId: event.params.postId,
+        });
+      }),
+    );
   },
 );
 
