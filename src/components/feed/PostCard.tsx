@@ -1,5 +1,7 @@
-import type { FC } from "react";
+import { useState, type FC } from "react";
+import { Heart, MessageCircle } from "lucide-react";
 import { useUI } from "../../contexts/UIContext";
+import { ImageLightbox } from "./ImageLightbox";
 import type { Post } from "../../types";
 
 function timeAgo(ts: any): string {
@@ -20,6 +22,11 @@ function timeAgo(ts: any): string {
 
 export const PostCard: FC<{ post: Post; isDarkMode: boolean }> = ({ post, isDarkMode }) => {
   const { openCreatorProfile } = useUI();
+  // Local-only like for now (visual). Wired to the likes store in the next slice.
+  const [liked, setLiked] = useState(false);
+  const [lightbox, setLightbox] = useState(-1);
+  const likeCount = (post.likesCount || 0) + (liked ? 1 : 0);
+  const images = post.imageUrls?.length ? post.imageUrls : post.imageUrl ? [post.imageUrl] : [];
   const goAuthor = () => {
     if (post.authorType === "creator") openCreatorProfile(post.authorId);
   };
@@ -53,24 +60,50 @@ export const PostCard: FC<{ post: Post; isDarkMode: boolean }> = ({ post, isDark
         </p>
       )}
 
-      {post.imageUrl && (
-        <img
-          src={post.imageUrl}
-          alt=""
-          className="mt-3 w-full max-h-[28rem] object-cover brutalist-border"
-          referrerPolicy="no-referrer"
-        />
+      {images.length > 0 && (
+        <div className={`mt-3 grid gap-2 ${images.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
+          {images.map((src, i) => (
+            <img
+              key={src}
+              src={src}
+              alt=""
+              onClick={() => setLightbox(i)}
+              referrerPolicy="no-referrer"
+              className={`w-full object-cover brutalist-border cursor-pointer ${
+                images.length === 1 ? "max-h-[28rem]" : "aspect-square"
+              }`}
+            />
+          ))}
+        </div>
       )}
 
-      {post.authorType === "creator" && (
+      <footer className={`mt-4 flex items-center gap-5 text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
         <button
-          onClick={goAuthor}
-          className={`mt-3 text-xs font-bold uppercase tracking-widest transition-colors ${
-            isDarkMode ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-black"
-          }`}
+          type="button"
+          onClick={() => setLiked((v) => !v)}
+          aria-pressed={liked}
+          className={`flex items-center gap-1.5 transition-colors ${isDarkMode ? "hover:text-white" : "hover:text-black"}`}
         >
-          View shop →
+          <Heart className={`w-4 h-4 ${liked ? "fill-current text-red-500" : ""}`} />
+          {likeCount}
         </button>
+        <span className="flex items-center gap-1.5">
+          <MessageCircle className="w-4 h-4" />
+          0
+        </span>
+        {post.authorType === "creator" && (
+          <button
+            type="button"
+            onClick={goAuthor}
+            className={`ml-auto transition-colors ${isDarkMode ? "hover:text-white" : "hover:text-black"}`}
+          >
+            View shop →
+          </button>
+        )}
+      </footer>
+
+      {lightbox >= 0 && (
+        <ImageLightbox images={images} index={lightbox} onIndex={setLightbox} onClose={() => setLightbox(-1)} />
       )}
     </article>
   );

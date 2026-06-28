@@ -83,7 +83,9 @@ export interface Post {
   authorName: string;
   authorImage?: string;
   text: string;
+  /** @deprecated single-image legacy field — use imageUrls. */
   imageUrl?: string;
+  imageUrls?: string[];
   createdAt?: any;
   likesCount?: number;
 }

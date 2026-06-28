@@ -20,6 +20,7 @@ export const en: Record<string, string> = {
   // Banner tabs
   "tabs.explore": "EXPLORE",
   "tabs.gallery": "GALLERY",
+  "tabs.feed": "FEED",
   "tabs.calendar": "EVENTS",
   "tabs.soon": "Soon",
 

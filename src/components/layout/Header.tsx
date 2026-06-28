@@ -230,7 +230,7 @@ export const Header: React.FC<HeaderProps> = ({ profileData, setSelectedCreator 
                       <button
                         onClick={() => {
                           setIsProfileDropdownOpen(false);
-                          navigate('/feed');
+                          navigate('/?tab=feed');
                         }}
                         className="text-left text-sm font-bold uppercase tracking-widest hover:opacity-70 transition-opacity"
                       >

@@ -10,7 +10,7 @@ export interface CreatePostInput {
   userName?: string;
   userImage?: string;
   text: string;
-  imageFile?: File | null;
+  imageFiles?: File[];
 }
 
 /**
@@ -20,9 +20,9 @@ export interface CreatePostInput {
  * An optional image is uploaded under posts/{uid}/ (compressed by uploadImage).
  */
 export async function createPost(input: CreatePostInput): Promise<void> {
-  const { uid, role, userName, userImage, text, imageFile } = input;
+  const { uid, role, userName, userImage, text, imageFiles = [] } = input;
   const body = text.trim();
-  if (!body && !imageFile) return; // nothing to post
+  if (!body && imageFiles.length === 0) return; // nothing to post
 
   let authorType: AuthorType = "user";
   let authorName = userName || "User";
@@ -42,9 +42,9 @@ export async function createPost(input: CreatePostInput): Promise<void> {
     }
   }
 
-  let imageUrl: string | undefined;
-  if (imageFile) {
-    imageUrl = await uploadImage(imageFile, `posts/${uid}`);
+  const imageUrls: string[] = [];
+  for (const file of imageFiles) {
+    imageUrls.push(await uploadImage(file, `posts/${uid}`));
   }
 
   await addDoc(collection(db, "posts"), {
@@ -53,7 +53,7 @@ export async function createPost(input: CreatePostInput): Promise<void> {
     authorName,
     authorImage: authorImage || null,
     text: body,
-    ...(imageUrl ? { imageUrl } : {}),
+    ...(imageUrls.length ? { imageUrls } : {}),
     createdAt: serverTimestamp(),
     likesCount: 0,
   });

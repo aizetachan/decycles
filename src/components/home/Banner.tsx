@@ -9,10 +9,12 @@ export const BANNER_IMAGES = [
   creators[1]?.coverImage || "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=1600&q=80"
 ];
 
+export type FeaturedTab = "EXPLORE" | "GALLERY" | "FEED" | "CALENDAR";
+
 interface BannerProps {
   isDarkMode: boolean;
-  featuredTab: "EXPLORE" | "GALLERY" | "CALENDAR";
-  setFeaturedTab: (tab: "EXPLORE" | "GALLERY" | "CALENDAR") => void;
+  featuredTab: FeaturedTab;
+  setFeaturedTab: (tab: FeaturedTab) => void;
 }
 
 export function Banner({ isDarkMode, featuredTab, setFeaturedTab }: BannerProps) {
@@ -75,7 +77,7 @@ export function Banner({ isDarkMode, featuredTab, setFeaturedTab }: BannerProps)
       <div className="absolute inset-x-0 bottom-4 md:bottom-8 flex justify-center z-20 pointer-events-auto">
         <div className="flex justify-center w-full mb-2 px-2 md:px-4">
           <div className={`inline-flex items-center p-1.5 md:p-2 brutalist-border brutalist-shadow rounded-full ${isDarkMode ? "bg-black" : "bg-white"}`}>
-            {(["EXPLORE", "GALLERY", "CALENDAR"] as const).map((tab) => {
+            {(["EXPLORE", "GALLERY", "FEED", "CALENDAR"] as const).map((tab) => {
               // All three tabs are live. The "Soon" tooltip / disabled state is
               // kept as a primitive in case we need to gate one again later.
               const isDisabled = false;
@@ -122,7 +124,7 @@ export function Banner({ isDarkMode, featuredTab, setFeaturedTab }: BannerProps)
                 >
                   {/* Apply the dim only to the label so the tooltip stays at full opacity. */}
                   <span className={`relative z-10 ${isDisabled ? "opacity-50" : ""}`}>
-                    {tab === "EXPLORE" ? t("tabs.explore") : tab === "GALLERY" ? t("tabs.gallery") : t("tabs.calendar")}
+                    {tab === "EXPLORE" ? t("tabs.explore") : tab === "GALLERY" ? t("tabs.gallery") : tab === "FEED" ? t("tabs.feed") : t("tabs.calendar")}
                   </span>
                   {featuredTab === tab && !isDisabled && (
                     <motion.div
