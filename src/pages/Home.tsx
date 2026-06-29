@@ -14,6 +14,7 @@ import { GalleryImageModal } from "../components/modals/GalleryImageModal";
 import { Header } from "../components/layout/Header";
 import { Banner, type FeaturedTab } from "../components/home/Banner";
 import { FeedView } from "../components/feed/FeedView";
+import { isMockMode } from "../lib/previewMock";
 import { FilterBar, EVENT_CATEGORIES } from "../components/home/FilterBar";
 import { SubcategoryFilter } from "../components/home/SubcategoryFilter";
 import { FiltersBottomSheet } from "../components/home/FiltersBottomSheet";
@@ -669,7 +670,7 @@ export function Home() {
       )}
 
       {featuredTab === "FEED" &&
-        ((profileDataRemote as any)?.role === "admin" ? (
+        ((profileDataRemote as any)?.role === "admin" || isMockMode() ? (
           <FeedView isDarkMode={isDarkMode} />
         ) : (
           <div className={`w-full py-24 text-center ${isDarkMode ? "bg-black text-gray-500" : "bg-gray-50 text-gray-400"}`}>

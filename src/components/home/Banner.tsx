@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useT } from "../../contexts/LanguageContext";
 import { useAuth } from "../../contexts/AuthContext";
+import { isMockMode } from "../../lib/previewMock";
 import { creators } from "../../data";
 
 export const BANNER_IMAGES = [
@@ -21,8 +22,9 @@ interface BannerProps {
 export function Banner({ isDarkMode, featuredTab, setFeaturedTab }: BannerProps) {
   const { t } = useT();
   const { userProfile } = useAuth();
-  // v1: the feed is admin-only. Non-admins see FEED as "Soon".
-  const isAdmin = (userProfile as any)?.role === "admin";
+  // v1: the feed is admin-only (non-admins see FEED as "Soon"). On a preview
+  // channel the gate is lifted so the team can demo the feed.
+  const isAdmin = (userProfile as any)?.role === "admin" || isMockMode();
   // Tap-to-reveal tooltip for disabled tabs (mobile has no hover).
   const [tappedSoonTab, setTappedSoonTab] = useState<string | null>(null);
   const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

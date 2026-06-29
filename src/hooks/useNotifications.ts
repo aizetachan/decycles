@@ -2,10 +2,8 @@ import { useState, useEffect } from "react";
 import { collection, query, orderBy, limit, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../contexts/AuthContext";
+import { isMockMode } from "../lib/previewMock";
 import type { Notification } from "../types";
-
-const isMock = () =>
-  typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mock") === "1";
 
 const MOCK_NOTIFICATIONS: Notification[] = [
   { id: "n1", type: "like", actorId: "mock-shop-2", actorName: "Vetra Cycles", postId: "mock-3", read: false, createdAt: new Date(Date.now() - 6e5) },
@@ -17,7 +15,7 @@ const MOCK_NOTIFICATIONS: Notification[] = [
 export function useNotifications() {
   const { currentUser } = useAuth();
   const [items, setItems] = useState<Notification[]>([]);
-  const mock = isMock();
+  const mock = isMockMode();
 
   useEffect(() => {
     if (mock) {

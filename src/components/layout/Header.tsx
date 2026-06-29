@@ -7,6 +7,7 @@ import { useT } from '../../contexts/LanguageContext';
 import { Creator } from '../../types';
 import { Link, useNavigate } from 'react-router-dom';
 import { NotificationBell } from './NotificationBell';
+import { isMockMode } from '../../lib/previewMock';
 
 interface HeaderProps {
   profileData: any;
@@ -126,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({ profileData, setSelectedCreator 
               {shortDisplayName}
             </span>
           )}
-          {!authLoading && loggedInUser && profileDataRemote?.role === 'admin' && (
+          {!authLoading && loggedInUser && (profileDataRemote?.role === 'admin' || isMockMode()) && (
             <NotificationBell isDarkMode={isDarkMode} />
           )}
           {!authLoading && !loggedInUser && (
@@ -231,7 +232,7 @@ export const Header: React.FC<HeaderProps> = ({ profileData, setSelectedCreator 
                       >
                         {t("header.viewProfile")}
                       </button>
-                      {profileDataRemote?.role === 'admin' && (
+                      {(profileDataRemote?.role === 'admin' || isMockMode()) && (
                         <button
                           onClick={() => {
                             setIsProfileDropdownOpen(false);

@@ -6,6 +6,7 @@ import { useUI } from "../../contexts/UIContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useFeed } from "../../hooks/useFeed";
 import { MOCK_POSTS } from "./mockPosts";
+import { isMockMode } from "../../lib/previewMock";
 
 type FeedFilter = "ALL" | "SHOPS" | "PEOPLE";
 
@@ -32,8 +33,8 @@ export function FeedView({ isDarkMode }: { isDarkMode: boolean }) {
   const scrollToComposer = () =>
     composerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
 
-  // Local design preview: ?mock=1 renders sample posts covering all variants.
-  const mock = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mock") === "1";
+  // Sample posts on ?mock=1 or on a preview channel (never in prod). See isMockMode.
+  const mock = isMockMode();
   const source = mock ? MOCK_POSTS : feed;
 
   const filtered = source.filter((p) =>
