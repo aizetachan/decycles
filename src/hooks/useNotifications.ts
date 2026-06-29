@@ -6,9 +6,9 @@ import { isMockMode } from "../lib/previewMock";
 import type { Notification } from "../types";
 
 const MOCK_NOTIFICATIONS: Notification[] = [
-  { id: "n1", type: "like", actorId: "mock-shop-2", actorName: "Vetra Cycles", postId: "mock-3", read: false, createdAt: new Date(Date.now() - 6e5) },
-  { id: "n2", type: "follow", actorId: "mock-user-1", actorName: "María G.", read: false, createdAt: new Date(Date.now() - 36e5) },
-  { id: "n3", type: "mention", actorId: "mock-shop-3", actorName: "Gritline Paintwork", postId: "mock-5", read: true, createdAt: new Date(Date.now() - 864e5) },
+  { id: "n1", type: "like", actorId: "mock-shop-2", actorName: "Vetra Cycles", actorImage: "https://images.unsplash.com/photo-1511994298241-608e28f14fde?auto=format&fit=crop&w=100&h=100&q=80", postId: "mock-3", read: false, createdAt: new Date(Date.now() - 6e5) },
+  { id: "n2", type: "follow", actorId: "mock-user-1", actorName: "María G.", actorImage: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=100&h=100&q=80", read: false, createdAt: new Date(Date.now() - 36e5) },
+  { id: "n3", type: "mention", actorId: "mock-shop-3", actorName: "Gritline Paintwork", actorImage: "https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=100&h=100&q=80", postId: "mock-5", read: true, createdAt: new Date(Date.now() - 864e5) },
 ];
 
 /** Live in-app notifications for the signed-in user (newest first). */
