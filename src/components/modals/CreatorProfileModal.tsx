@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Globe, MapPin, Maximize2, Heart, Share2, Check, Loader2 } from "lucide-react";
 import { FollowButton } from "../ui/FollowButton";
+import { AuthorPosts } from "../feed/AuthorPosts";
 import { doc, getDoc, updateDoc, increment } from "firebase/firestore";
 import { creators as seedCreators } from "../../data";
 import { useUI } from "../../contexts/UIContext";
@@ -559,6 +560,7 @@ export function CreatorProfileModal() {
                       )}
                     </div>
                   </div>
+                  <AuthorPosts authorId={selectedCreator.id} isDarkMode={isDarkMode} />
                 </>
               )}
             </motion.div>

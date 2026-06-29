@@ -668,7 +668,14 @@ export function Home() {
         </div>
       )}
 
-      {featuredTab === "FEED" && <FeedView isDarkMode={isDarkMode} />}
+      {featuredTab === "FEED" &&
+        ((profileDataRemote as any)?.role === "admin" ? (
+          <FeedView isDarkMode={isDarkMode} />
+        ) : (
+          <div className={`w-full py-24 text-center ${isDarkMode ? "bg-black text-gray-500" : "bg-gray-50 text-gray-400"}`}>
+            <p className="text-sm font-bold uppercase tracking-widest">Feed — coming soon</p>
+          </div>
+        ))}
 
       {featuredTab === "EXPLORE" && (
         <>

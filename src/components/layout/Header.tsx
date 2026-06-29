@@ -126,7 +126,7 @@ export const Header: React.FC<HeaderProps> = ({ profileData, setSelectedCreator 
               {shortDisplayName}
             </span>
           )}
-          {!authLoading && loggedInUser && (
+          {!authLoading && loggedInUser && profileDataRemote?.role === 'admin' && (
             <NotificationBell isDarkMode={isDarkMode} />
           )}
           {!authLoading && !loggedInUser && (
@@ -231,15 +231,17 @@ export const Header: React.FC<HeaderProps> = ({ profileData, setSelectedCreator 
                       >
                         {t("header.viewProfile")}
                       </button>
-                      <button
-                        onClick={() => {
-                          setIsProfileDropdownOpen(false);
-                          navigate('/?tab=feed');
-                        }}
-                        className="text-left text-sm font-bold uppercase tracking-widest hover:opacity-70 transition-opacity"
-                      >
-                        Feed
-                      </button>
+                      {profileDataRemote?.role === 'admin' && (
+                        <button
+                          onClick={() => {
+                            setIsProfileDropdownOpen(false);
+                            navigate('/?tab=feed');
+                          }}
+                          className="text-left text-sm font-bold uppercase tracking-widest hover:opacity-70 transition-opacity"
+                        >
+                          Feed
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setIsProfileDropdownOpen(false);
