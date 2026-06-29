@@ -12,7 +12,9 @@ import { SupportModal } from "../components/modals/SupportModal";
 import { JoinModal } from "../components/modals/JoinModal";
 import { GalleryImageModal } from "../components/modals/GalleryImageModal";
 import { Header } from "../components/layout/Header";
-import { Banner } from "../components/home/Banner";
+import { Banner, type FeaturedTab } from "../components/home/Banner";
+import { FeedView } from "../components/feed/FeedView";
+import { isMockMode } from "../lib/previewMock";
 import { FilterBar, EVENT_CATEGORIES } from "../components/home/FilterBar";
 import { SubcategoryFilter } from "../components/home/SubcategoryFilter";
 import { FiltersBottomSheet } from "../components/home/FiltersBottomSheet";
@@ -229,9 +231,10 @@ export function Home() {
     const t = (searchParams.get("tab") || "").toLowerCase();
     if (t === "calendar") return "CALENDAR" as const;
     if (t === "gallery") return "GALLERY" as const;
+    if (t === "feed") return "FEED" as const;
     return "EXPLORE" as const;
   })();
-  const [featuredTab, setFeaturedTab] = useState<"EXPLORE" | "GALLERY" | "CALENDAR">(initialTab);
+  const [featuredTab, setFeaturedTab] = useState<FeaturedTab>(initialTab);
   const [calendarDate, setCalendarDate] = useState(new Date());
 
   // One fresh random seed per page load → the gallery shows a new creator order
@@ -617,11 +620,10 @@ export function Home() {
 
       <Banner isDarkMode={isDarkMode} featuredTab={featuredTab} setFeaturedTab={setFeaturedTab} />
 
-      {/* Featured Sections */}
-      <div className={`w-full ${featuredTab === "EXPLORE" ? "" : "py-12 border-b"} ${isDarkMode ? "bg-black border-white/10" : "bg-gray-50 border-black/10"}`}>
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col gap-8">
-          {/* Content */}
-          {featuredTab !== "EXPLORE" && (
+      {/* Featured Sections — gallery / events grids */}
+      {(featuredTab === "GALLERY" || featuredTab === "CALENDAR") && (
+        <div className={`w-full py-12 border-b ${isDarkMode ? "bg-black border-white/10" : "bg-gray-50 border-black/10"}`}>
+          <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col gap-8">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <AnimatePresence mode="wait">
                 {featuredTab === "GALLERY" ? (
@@ -636,11 +638,11 @@ export function Home() {
                       onClick={() => setSelectedGalleryImage(item)}
                     >
                       <div className={`aspect-square overflow-hidden relative`}>
-                        <img 
-                          src={item.img} 
-                          alt={item.creator.name} 
-                          className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105" 
-                          referrerPolicy="no-referrer" 
+                        <img
+                          src={item.img}
+                          alt={item.creator.name}
+                          className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105"
+                          referrerPolicy="no-referrer"
                         />
                       </div>
                       <span className={`text-xs font-bold uppercase tracking-widest text-center ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
@@ -663,9 +665,18 @@ export function Home() {
                 ) : null}
               </AnimatePresence>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {featuredTab === "FEED" &&
+        ((profileDataRemote as any)?.role === "admin" || isMockMode() ? (
+          <FeedView isDarkMode={isDarkMode} />
+        ) : (
+          <div className={`w-full py-24 text-center ${isDarkMode ? "bg-black text-gray-500" : "bg-gray-50 text-gray-400"}`}>
+            <p className="text-sm font-bold uppercase tracking-widest">Feed — coming soon</p>
+          </div>
+        ))}
 
       {featuredTab === "EXPLORE" && (
         <>

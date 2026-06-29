@@ -8,12 +8,12 @@
 const fs = require("fs");
 const path = require("path");
 const functions = require("firebase-functions/v1");
-const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { onDocumentWritten, onDocumentCreated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions/v2");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
-const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getStorage } = require("firebase-admin/storage");
 
 initializeApp();
@@ -156,6 +156,165 @@ exports.cleanupUserImages = onDocumentWritten(
       event.data?.before?.data(),
       event.data?.after?.data(),
       "cleanupUserImages",
+    );
+  },
+);
+
+// Add an in-app notification to users/{recipientId}/notifications. Never
+// notifies someone about their own action.
+async function notify(db, recipientId, actorId, payload) {
+  if (!recipientId || recipientId === actorId) return;
+  try {
+    await db.collection(`users/${recipientId}/notifications`).add({
+      ...payload,
+      actorId,
+      read: false,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    logger.error(`[notify] failed for ${recipientId}:`, err);
+  }
+}
+
+// Keep follower/following counts in sync as follows/{id} docs are created and
+// deleted, and notify the followee on a new follow. followerId is always a
+// user; followeeType ("creator" | "user") says which collection the followee
+// lives in (its id is also the owner's uid).
+exports.syncFollowCounts = onDocumentWritten(
+  { document: "follows/{followId}", region: "us-central1" },
+  async (event) => {
+    const had = event.data?.before?.exists;
+    const has = event.data?.after?.exists;
+    let delta = 0;
+    if (!had && has) delta = 1;       // created
+    else if (had && !has) delta = -1; // deleted
+    else return;                       // no-op rewrite
+
+    const data = (has ? event.data.after.data() : event.data.before.data()) || {};
+    const { followerId, followeeId, followeeType } = data;
+    if (!followerId || !followeeId || !followeeType) return;
+
+    const db = getFirestore();
+    const followeeCol = followeeType === "creator" ? "creators" : "users";
+    try {
+      await Promise.all([
+        db.doc(`users/${followerId}`).set(
+          { followingCount: FieldValue.increment(delta) },
+          { merge: true },
+        ),
+        db.doc(`${followeeCol}/${followeeId}`).set(
+          { followersCount: FieldValue.increment(delta) },
+          { merge: true },
+        ),
+      ]);
+    } catch (err) {
+      logger.error(`[syncFollowCounts] failed for ${event.params.followId}:`, err);
+    }
+
+    if (delta === 1) {
+      const followerSnap = await db.doc(`users/${followerId}`).get().catch(() => null);
+      const f = (followerSnap && followerSnap.data()) || {};
+      await notify(db, followeeId, followerId, {
+        type: "follow",
+        actorName: f.name || "Someone",
+        actorImage: f.profileImage || null,
+      });
+    }
+  },
+);
+
+// Keep likesCount in sync as likes/{id} docs are created and deleted. The
+// targetType ("post" | "creator" | "user") selects which collection's doc to
+// bump, so the same store powers post likes and shop/profile likes.
+exports.syncLikeCounts = onDocumentWritten(
+  { document: "likes/{likeId}", region: "us-central1" },
+  async (event) => {
+    const had = event.data?.before?.exists;
+    const has = event.data?.after?.exists;
+    let delta = 0;
+    if (!had && has) delta = 1;
+    else if (had && !has) delta = -1;
+    else return;
+
+    const data = (has ? event.data.after.data() : event.data.before.data()) || {};
+    const { targetType, targetId } = data;
+    if (!targetType || !targetId) return;
+
+    const db = getFirestore();
+    const col = targetType === "post" ? "posts" : targetType === "creator" ? "creators" : "users";
+    try {
+      await db.doc(`${col}/${targetId}`).set({ likesCount: FieldValue.increment(delta) }, { merge: true });
+    } catch (err) {
+      logger.error(`[syncLikeCounts] failed for ${event.params.likeId}:`, err);
+    }
+
+    // Notify the post author on a new like.
+    if (delta === 1 && targetType === "post") {
+      const postSnap = await db.doc(`posts/${targetId}`).get().catch(() => null);
+      const post = postSnap && postSnap.data();
+      if (post && post.authorId) {
+        const likerSnap = await db.doc(`users/${data.userId}`).get().catch(() => null);
+        const liker = (likerSnap && likerSnap.data()) || {};
+        await notify(db, post.authorId, data.userId, {
+          type: "like",
+          actorName: liker.name || "Someone",
+          actorImage: liker.profileImage || null,
+          postId: targetId,
+        });
+      }
+    }
+  },
+);
+
+// Notify each tagged creator/user when a post mentioning them is created. The
+// mention id is the target's uid (a creator's id is also its owner's uid).
+exports.notifyMentions = onDocumentCreated(
+  { document: "posts/{postId}", region: "us-central1" },
+  async (event) => {
+    const post = event.data && event.data.data();
+    if (!post || !Array.isArray(post.mentions) || post.mentions.length === 0) return;
+    const db = getFirestore();
+    const seen = new Set();
+    await Promise.all(
+      post.mentions.map((m) => {
+        if (!m || !m.id || seen.has(m.id)) return null;
+        seen.add(m.id);
+        return notify(db, m.id, post.authorId, {
+          type: "mention",
+          actorName: post.authorName || "Someone",
+          actorImage: post.authorImage || null,
+          postId: event.params.postId,
+        });
+      }),
+    );
+  },
+);
+
+// When a post is deleted (by its author or an admin), remove its images from
+// Storage so nothing is orphaned.
+exports.cleanupDeletedPost = onDocumentDeleted(
+  { document: "posts/{postId}", region: "us-central1" },
+  async (event) => {
+    const post = event.data && event.data.data();
+    if (!post) return;
+    const urls = Array.isArray(post.imageUrls)
+      ? post.imageUrls
+      : post.imageUrl
+        ? [post.imageUrl]
+        : [];
+    if (!urls.length) return;
+    const bucket = getStorage().bucket(STORAGE_BUCKET);
+    await Promise.all(
+      urls.map((u) => {
+        const path = bucketObjectPath(u);
+        if (!path) return null;
+        return bucket
+          .file(path)
+          .delete()
+          .catch((e) => {
+            if (e?.code !== 404) logger.warn(`[cleanupDeletedPost] could not delete ${path}:`, e?.message || e);
+          });
+      }),
     );
   },
 );

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Globe, MapPin, Maximize2, Heart, Share2, Check, Loader2 } from "lucide-react";
+import { FollowButton } from "../ui/FollowButton";
+import { AuthorPosts } from "../feed/AuthorPosts";
 import { doc, getDoc, updateDoc, increment } from "firebase/firestore";
 import { creators as seedCreators } from "../../data";
 import { useUI } from "../../contexts/UIContext";
@@ -27,6 +29,7 @@ export function CreatorProfileModal() {
     selectedCreatorId,
     closeCreatorProfile,
     openCreatorProfile,
+    openJoinModal,
   } = useUI();
   const { currentUser, userProfile: profileData, updateUserProfile } = useAuth();
   const { t } = useT();
@@ -362,6 +365,19 @@ export function CreatorProfileModal() {
                           <h2 className={`text-2xl font-bold uppercase tracking-widest ${isDarkMode ? "text-white" : "text-black"}`}>
                             {selectedCreator.name}
                           </h2>
+                          <div className="mt-3 flex items-center gap-3">
+                            <FollowButton
+                              targetId={selectedCreator.id}
+                              targetType="creator"
+                              isDarkMode={isDarkMode}
+                              onRequireAuth={() => openJoinModal("signup")}
+                            />
+                            {typeof selectedCreator.followersCount === "number" && selectedCreator.followersCount > 0 && (
+                              <span className={`text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                                {selectedCreator.followersCount} {selectedCreator.followersCount === 1 ? "follower" : "followers"}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       )}
 
@@ -544,6 +560,7 @@ export function CreatorProfileModal() {
                       )}
                     </div>
                   </div>
+                  <AuthorPosts authorId={selectedCreator.id} isDarkMode={isDarkMode} />
                 </>
               )}
             </motion.div>

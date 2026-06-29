@@ -6,6 +6,8 @@ import { useUI } from '../../contexts/UIContext';
 import { useT } from '../../contexts/LanguageContext';
 import { Creator } from '../../types';
 import { Link, useNavigate } from 'react-router-dom';
+import { NotificationBell } from './NotificationBell';
+import { isMockMode } from '../../lib/previewMock';
 
 interface HeaderProps {
   profileData: any;
@@ -125,6 +127,9 @@ export const Header: React.FC<HeaderProps> = ({ profileData, setSelectedCreator 
               {shortDisplayName}
             </span>
           )}
+          {!authLoading && loggedInUser && (profileDataRemote?.role === 'admin' || isMockMode()) && (
+            <NotificationBell isDarkMode={isDarkMode} />
+          )}
           {!authLoading && !loggedInUser && (
             <button
               onClick={() => openJoinModal('signup')}
@@ -227,6 +232,17 @@ export const Header: React.FC<HeaderProps> = ({ profileData, setSelectedCreator 
                       >
                         {t("header.viewProfile")}
                       </button>
+                      {(profileDataRemote?.role === 'admin' || isMockMode()) && (
+                        <button
+                          onClick={() => {
+                            setIsProfileDropdownOpen(false);
+                            navigate('/?tab=feed');
+                          }}
+                          className="text-left text-sm font-bold uppercase tracking-widest hover:opacity-70 transition-opacity"
+                        >
+                          Feed
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setIsProfileDropdownOpen(false);

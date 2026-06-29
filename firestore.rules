@@ -23,6 +23,13 @@ service cloud.firestore {
       allow update: if isAdmin()
         || (isSignedIn() && request.auth.uid == userId);
       allow delete: if isAdmin();
+
+      // Private per-user notifications. Written only by Cloud Functions (admin
+      // SDK bypasses rules); the owner can read them and mark them read/delete.
+      match /notifications/{notifId} {
+        allow read, update, delete: if isSignedIn() && request.auth.uid == userId;
+        allow create: if false;
+      }
     }
 
     match /creators/{creatorId} {
@@ -60,6 +67,49 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+    }
+
+    // Posts — wall/feed content authored by a creator (shop) or a user.
+    // authorId must be the signed-in user on create; only the author can
+    // edit/delete. Public read (the feed). likesCount is maintained by a
+    // trigger (admin SDK), so client writes never set it directly.
+    match /posts/{postId} {
+      allow read: if true;
+      // v1: posting is admin-only (hard enforcement, not just UI gating).
+      allow create: if isAdmin()
+        && request.resource.data.authorId == request.auth.uid;
+      // The author can edit/delete their own post; admins can delete any
+      // (moderation). likesCount is maintained by a trigger.
+      allow update: if isSignedIn() && resource.data.authorId == request.auth.uid;
+      allow delete: if isAdmin()
+        || (isSignedIn() && resource.data.authorId == request.auth.uid);
+    }
+
+    // Follows — one document per (follower, followee). Doc id is
+    // `{followerId}_{followeeId}`. followerId is always the signed-in user;
+    // followeeType ("creator" | "user") records WHAT is followed so triggers
+    // and queries know which collection it belongs to (it is NOT a
+    // "followed-or-not" flag — that's just whether this doc exists). Public
+    // read (follower counts / "following" lists); only the follower may
+    // create/delete their own follow. No update — a follow only exists or not.
+    match /follows/{followId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.followerId == request.auth.uid;
+      allow delete: if isSignedIn()
+        && resource.data.followerId == request.auth.uid;
+    }
+
+    // Likes (the ♥). One doc per (user, target). Doc id is
+    // `{userId}_{targetType}_{targetId}`. targetType ("post" | "creator" |
+    // "user") selects the collection whose likesCount a trigger maintains.
+    // Public read (counts); only the liker can create/delete their own like.
+    match /likes/{likeId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn()
         && resource.data.userId == request.auth.uid;
     }
   }

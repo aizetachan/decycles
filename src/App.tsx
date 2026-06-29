@@ -22,6 +22,8 @@ import { FiltersAdmin } from "./pages/admin/FiltersAdmin";
 import { JoinModal } from "./components/modals/JoinModal";
 import { CreatorProfileModal } from "./components/modals/CreatorProfileModal";
 import { EventModal } from "./components/modals/EventModal";
+import { PostModal } from "./components/modals/PostModal";
+import { UserProfileModal } from "./components/modals/UserProfileModal";
 import { useUI } from "./contexts/UIContext";
 import { CookieBanner } from "./components/layout/CookieBanner";
 import { useAuth } from "./contexts/AuthContext";
@@ -70,6 +72,16 @@ function CreatorDeepLinkRedirect() {
   return <Navigate to="/" replace />;
 }
 
+/** Deep link to /post/:id — opens the post modal on top of Home. */
+function PostDeepLink() {
+  const { id } = useParams<{ id: string }>();
+  const { openPost } = useUI();
+  useEffect(() => {
+    if (id) openPost(id);
+  }, [id, openPost]);
+  return <Navigate to="/" replace />;
+}
+
 export default function App() {
   const { isDarkMode, isJoinModalOpen, setIsJoinModalOpen } = useUI();
   const { currentUser, userProfile } = useAuth();
@@ -99,6 +111,7 @@ export default function App() {
         <Route path="/welcome" element={<Welcome />} />
         <Route path="/event/:creatorId/:eventIdx" element={<EventPage />} />
         <Route path="/creator/:id" element={<CreatorDeepLinkRedirect />} />
+        <Route path="/post/:id" element={<PostDeepLink />} />
         <Route path="/profile/edit" element={<EditProfile />} />
         <Route path="/favorites" element={<Favorites />} />
         <Route path="/my-events" element={<MyEvents />} />
@@ -124,6 +137,8 @@ export default function App() {
       />
       <CreatorProfileModal />
       <EventModal />
+      <PostModal />
+      <UserProfileModal />
       <CookieBanner />
     </>
   );

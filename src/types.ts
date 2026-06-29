@@ -50,4 +50,75 @@ export interface Creator {
   isPublished?: boolean;
   events?: any[];
   filters?: string[];
+  /** Cached follower count, maintained by the syncFollowCounts function. */
+  followersCount?: number;
+}
+
+/** What kind of entity is being followed (selects the target collection). */
+export type FolloweeType = "creator" | "user";
+
+/**
+ * A follow relationship. Doc id is `{followerId}_{followeeId}`. Whether someone
+ * is followed is answered by this doc's existence — `followeeType` only records
+ * WHAT is followed (a creator/shop or a user) so we know which collection it is.
+ */
+export interface Follow {
+  followerId: string;
+  followeeId: string;
+  followeeType: FolloweeType;
+  createdAt?: any;
+}
+
+/** What a ♥ like can target. */
+export type LikeTargetType = "post" | "creator" | "user";
+
+/** A ♥ like. Doc id is `{userId}_{targetType}_{targetId}`. */
+export interface Like {
+  userId: string;
+  targetType: LikeTargetType;
+  targetId: string;
+  createdAt?: any;
+}
+
+/** Who authored a post — a creator/shop or a regular user. */
+export type AuthorType = "creator" | "user";
+
+/** A creator/user tagged in a post via @mention. */
+export interface PostMention {
+  type: "creator" | "user";
+  id: string;
+  name: string;
+}
+
+export type NotificationType = "follow" | "like" | "mention";
+
+/** In-app notification, stored at users/{uid}/notifications/{id}. */
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  actorId: string;
+  actorName: string;
+  actorImage?: string | null;
+  postId?: string;
+  read?: boolean;
+  createdAt?: any;
+}
+
+/**
+ * A wall/feed post. Author name & image are denormalized so the feed renders
+ * without an extra read per post. likesCount is maintained by a trigger.
+ */
+export interface Post {
+  id: string;
+  authorId: string;
+  authorType: AuthorType;
+  authorName: string;
+  authorImage?: string;
+  text: string;
+  /** @deprecated single-image legacy field — use imageUrls. */
+  imageUrl?: string;
+  imageUrls?: string[];
+  mentions?: PostMention[];
+  createdAt?: any;
+  likesCount?: number;
 }

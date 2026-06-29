@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useT } from "../../contexts/LanguageContext";
+import { useAuth } from "../../contexts/AuthContext";
+import { isMockMode } from "../../lib/previewMock";
 import { creators } from "../../data";
 
 export const BANNER_IMAGES = [
@@ -9,14 +11,20 @@ export const BANNER_IMAGES = [
   creators[1]?.coverImage || "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=1600&q=80"
 ];
 
+export type FeaturedTab = "EXPLORE" | "GALLERY" | "FEED" | "CALENDAR";
+
 interface BannerProps {
   isDarkMode: boolean;
-  featuredTab: "EXPLORE" | "GALLERY" | "CALENDAR";
-  setFeaturedTab: (tab: "EXPLORE" | "GALLERY" | "CALENDAR") => void;
+  featuredTab: FeaturedTab;
+  setFeaturedTab: (tab: FeaturedTab) => void;
 }
 
 export function Banner({ isDarkMode, featuredTab, setFeaturedTab }: BannerProps) {
   const { t } = useT();
+  const { userProfile } = useAuth();
+  // v1: the feed is admin-only (non-admins see FEED as "Soon"). On a preview
+  // channel the gate is lifted so the team can demo the feed.
+  const isAdmin = (userProfile as any)?.role === "admin" || isMockMode();
   // Tap-to-reveal tooltip for disabled tabs (mobile has no hover).
   const [tappedSoonTab, setTappedSoonTab] = useState<string | null>(null);
   const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -75,10 +83,9 @@ export function Banner({ isDarkMode, featuredTab, setFeaturedTab }: BannerProps)
       <div className="absolute inset-x-0 bottom-4 md:bottom-8 flex justify-center z-20 pointer-events-auto">
         <div className="flex justify-center w-full mb-2 px-2 md:px-4">
           <div className={`inline-flex items-center p-1.5 md:p-2 brutalist-border brutalist-shadow rounded-full ${isDarkMode ? "bg-black" : "bg-white"}`}>
-            {(["EXPLORE", "GALLERY", "CALENDAR"] as const).map((tab) => {
-              // All three tabs are live. The "Soon" tooltip / disabled state is
-              // kept as a primitive in case we need to gate one again later.
-              const isDisabled = false;
+            {(["EXPLORE", "GALLERY", "FEED", "CALENDAR"] as const).map((tab) => {
+              // The feed is admin-only in v1 — non-admins see FEED as "Soon".
+              const isDisabled = tab === "FEED" && !isAdmin;
               const showTooltip = isDisabled && tappedSoonTab === tab;
 
               return (
@@ -121,8 +128,13 @@ export function Banner({ isDarkMode, featuredTab, setFeaturedTab }: BannerProps)
                   }`}
                 >
                   {/* Apply the dim only to the label so the tooltip stays at full opacity. */}
-                  <span className={`relative z-10 ${isDisabled ? "opacity-50" : ""}`}>
-                    {tab === "EXPLORE" ? t("tabs.explore") : tab === "GALLERY" ? t("tabs.gallery") : t("tabs.calendar")}
+                  <span className={`relative z-10 inline-flex items-center gap-1.5 ${isDisabled ? "opacity-60" : ""}`}>
+                    {tab === "EXPLORE" ? t("tabs.explore") : tab === "GALLERY" ? t("tabs.gallery") : tab === "FEED" ? t("tabs.feed") : t("tabs.calendar")}
+                    {isDisabled && (
+                      <span className="rounded-sm bg-gray-500 px-1 py-0.5 text-[8px] font-bold leading-none tracking-widest text-white">
+                        {t("tabs.soon")}
+                      </span>
+                    )}
                   </span>
                   {featuredTab === tab && !isDisabled && (
                     <motion.div
