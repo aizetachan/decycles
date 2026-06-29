@@ -19,3 +19,8 @@ jobs:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_DECYCLES_WEB_APP_1777399378 }}
           projectId: decycles-web-app-1777399378
+          # Fixed channel → stable URL, so we only authorize ONE domain in
+          # Firebase Auth (instead of a new per-PR domain every time). The
+          # expiry resets on each deploy, keeping the URL alive during dev.
+          channelId: preview
+          expires: 30d
