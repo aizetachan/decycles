@@ -12,11 +12,15 @@ export function MentionInput({
   placeholder,
   resetKey,
   onChange,
+  initialText,
+  initialMentions,
 }: {
   isDarkMode: boolean;
   placeholder: string;
   resetKey: number;
   onChange: (text: string, mentions: PostMention[]) => void;
+  initialText?: string;
+  initialMentions?: PostMention[];
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const rangeRef = useRef<Range | null>(null);
@@ -30,11 +34,20 @@ export function MentionInput({
       ? items.filter((m) => m.name.toLowerCase().includes(query.toLowerCase())).slice(0, 6)
       : [];
 
-  // Clear when the parent bumps resetKey (after a post).
+  // Build initial content (edit mode) / clear when the parent bumps resetKey.
   useEffect(() => {
-    if (ref.current) ref.current.innerHTML = "";
-    setEmpty(true);
+    if (!ref.current) return;
+    ref.current.innerHTML = "";
+    if (initialText) {
+      buildInitial(ref.current, initialText, initialMentions || []);
+      const { text, mentions } = parseEditor(ref.current);
+      setEmpty(text.trim().length === 0);
+      onChange(text, mentions);
+    } else {
+      setEmpty(true);
+    }
     setQuery(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey]);
 
   const emit = () => {
@@ -202,6 +215,29 @@ export function MentionInput({
       )}
     </div>
   );
+}
+
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Build the editor DOM from text + mentions (edit mode), inverse of parseEditor. */
+function buildInitial(root: HTMLElement, text: string, mentions: PostMention[]) {
+  if (!mentions.length) {
+    root.appendChild(document.createTextNode(text));
+    return;
+  }
+  const byLength = [...mentions].sort((a, b) => b.name.length - a.name.length);
+  const pattern = new RegExp("@(" + byLength.map((m) => escapeRegex(m.name)).join("|") + ")", "g");
+  let last = 0;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > last) root.appendChild(document.createTextNode(text.slice(last, match.index)));
+    const name = match[1];
+    const m = mentions.find((x) => x.name === name);
+    if (m) root.appendChild(createMentionEl({ id: m.id, type: m.type, name: m.name }));
+    else root.appendChild(document.createTextNode(`@${name}`));
+    last = pattern.lastIndex;
+  }
+  if (last < text.length) root.appendChild(document.createTextNode(text.slice(last)));
 }
 
 function createMentionEl(c: Mentionable): HTMLSpanElement {

@@ -36,6 +36,9 @@ interface UIContextType {
   selectedPostId: string | null;
   openPost: (id: string) => void;
   closePost: () => void;
+  selectedUserId: string | null;
+  openUserProfile: (id: string) => void;
+  closeUserProfile: () => void;
   // Event detail modal — opens on top of any page when an event chip in the
   // calendar (or anywhere) is clicked. Holds the event payload directly
   // because events live nested inside creator docs, not in a dedicated
@@ -90,6 +93,7 @@ export function UIProvider({ children }: { children: ReactNode }) {
   const [isAuthSidebarOpen, setIsAuthSidebarOpen] = useState(false);
   const [selectedCreatorId, setSelectedCreatorId] = useState<string | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
 
   const openJoinModal = (mode: JoinModalMode = 'signup') => {
@@ -101,6 +105,8 @@ export function UIProvider({ children }: { children: ReactNode }) {
   const closeCreatorProfile = () => setSelectedCreatorId(null);
   const openPost = (id: string) => setSelectedPostId(id);
   const closePost = () => setSelectedPostId(null);
+  const openUserProfile = (id: string) => setSelectedUserId(id);
+  const closeUserProfile = () => setSelectedUserId(null);
 
   const openEvent = (event: any) => setSelectedEvent(event);
   const closeEvent = () => setSelectedEvent(null);
@@ -145,6 +151,9 @@ export function UIProvider({ children }: { children: ReactNode }) {
         selectedPostId,
         openPost,
         closePost,
+        selectedUserId,
+        openUserProfile,
+        closeUserProfile,
         selectedEvent,
         openEvent,
         closeEvent,

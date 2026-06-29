@@ -26,14 +26,14 @@ function label(n: Notification): string {
 
 export function NotificationBell({ isDarkMode }: { isDarkMode: boolean }) {
   const { items, unreadCount, markAllRead } = useNotifications();
-  const { openPost, openCreatorProfile } = useUI();
+  const { openPost, openUserProfile } = useUI();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   const onItemClick = (n: Notification) => {
     setOpen(false);
     if (n.postId) openPost(n.postId);
-    else if (n.type === "follow") openCreatorProfile(n.actorId);
+    else if (n.type === "follow") openUserProfile(n.actorId);
   };
 
   useEffect(() => {

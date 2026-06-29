@@ -8,7 +8,7 @@
 const fs = require("fs");
 const path = require("path");
 const functions = require("firebase-functions/v1");
-const { onDocumentWritten, onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onDocumentWritten, onDocumentCreated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions/v2");
 const { initializeApp } = require("firebase-admin/app");
@@ -285,6 +285,35 @@ exports.notifyMentions = onDocumentCreated(
           actorImage: post.authorImage || null,
           postId: event.params.postId,
         });
+      }),
+    );
+  },
+);
+
+// When a post is deleted (by its author or an admin), remove its images from
+// Storage so nothing is orphaned.
+exports.cleanupDeletedPost = onDocumentDeleted(
+  { document: "posts/{postId}", region: "us-central1" },
+  async (event) => {
+    const post = event.data && event.data.data();
+    if (!post) return;
+    const urls = Array.isArray(post.imageUrls)
+      ? post.imageUrls
+      : post.imageUrl
+        ? [post.imageUrl]
+        : [];
+    if (!urls.length) return;
+    const bucket = getStorage().bucket(STORAGE_BUCKET);
+    await Promise.all(
+      urls.map((u) => {
+        const path = bucketObjectPath(u);
+        if (!path) return null;
+        return bucket
+          .file(path)
+          .delete()
+          .catch((e) => {
+            if (e?.code !== 404) logger.warn(`[cleanupDeletedPost] could not delete ${path}:`, e?.message || e);
+          });
       }),
     );
   },

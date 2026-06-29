@@ -78,8 +78,11 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isSignedIn()
         && request.resource.data.authorId == request.auth.uid;
-      allow update, delete: if isSignedIn()
-        && resource.data.authorId == request.auth.uid;
+      // The author can edit/delete their own post; admins can delete any
+      // (moderation). likesCount is maintained by a trigger.
+      allow update: if isSignedIn() && resource.data.authorId == request.auth.uid;
+      allow delete: if isAdmin()
+        || (isSignedIn() && resource.data.authorId == request.auth.uid);
     }
 
     // Follows — one document per (follower, followee). Doc id is
