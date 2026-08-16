@@ -262,7 +262,7 @@ codificación), compresión y redimensionado en cliente antes de subir, y
 cómo se decide, qué no se hace— vivía solo en la cabeza del fundador. Además, el
 proyecto se trabaja con Claude, que empieza cada sesión sin memoria del anterior.
 
-**Decisión.** Crear `docs/product/` con catorce documentos versionados en el repo.
+**Decisión.** Crear `docs/product/` con quince documentos versionados en el repo.
 `00-CLAUDE-PRODUCT-LEAD.md` funciona como prompt base del rol *Product Designer
 Full-Stack con visión de CEO*; el resto es su base de conocimiento y, a la vez,
 documentación para personas.

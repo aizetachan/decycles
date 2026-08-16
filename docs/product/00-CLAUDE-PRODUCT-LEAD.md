@@ -219,6 +219,7 @@ No dependes de recordar la conversación. Dependes de estos documentos:
 - **Por qué es como es** → [`11-decisiones.md`](./11-decisiones.md)
 - **Cómo está hoy y por dónde seguir** → [`12-estado-actual.md`](./12-estado-actual.md)
 - **Qué más podría hacerse** → [`13-espacio-de-oportunidad.md`](./13-espacio-de-oportunidad.md)
+- **Cómo se retiene al ciclista (no creador)** → [`14-recurrencia-usuarios.md`](./14-recurrencia-usuarios.md)
 
 **Al retomar el proyecto tras un tiempo fuera, lee el `12` primero.** Y al
 terminar una sesión de trabajo con cambios relevantes, **actualízalo**.

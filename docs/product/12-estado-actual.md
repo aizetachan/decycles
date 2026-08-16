@@ -73,6 +73,10 @@ el template se pisa con una versión vieja.
 | | Cantidad | Notas |
 |---|---|---|
 | Páginas públicas y de usuario | 8 | Home, Welcome, EventPage, EditProfile, Favorites, MyEvents, ResetPassword, redirección de creador |
+
+> ⚠️ **Corrección:** `/my-events` es el **editor de eventos del creador**, no la
+> lista de eventos a los que un usuario ha confirmado asistencia — esa pantalla
+> no existe. Detalle en [`14`](./14-recurrencia-usuarios.md) §2.
 | Páginas de admin | 6 | Dashboard, Users, Creators, AdminCreatorEdit, CategoriesAdmin, FiltersAdmin |
 | Componentes | ~25 | Agrupados en `auth/`, `events/`, `home/`, `layout/`, `modals/`, `ui/` |
 | Contextos | 4 | Auth, UI, Language, Categories |

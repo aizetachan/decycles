@@ -41,7 +41,12 @@
 **Autenticado**
 - `/profile/edit` — portal del creador.
 - `/favorites` — creadores y eventos guardados.
-- `/my-events` — eventos a los que se ha confirmado asistencia.
+- `/my-events` — **editor de eventos del creador** (carga `creators/{uid}` y
+  muestra los asistentes de cada evento). ⚠️ Pese al nombre, **no** es la lista
+  de eventos a los que el usuario ha confirmado asistencia: esa pantalla no
+  existe. Además, el menú de perfil enlaza aquí y a `/profile/edit` para
+  cualquier usuario autenticado, sin comprobar el rol. Ver
+  [`14`](./14-recurrencia-usuarios.md) §2.
 
 **Admin** (`ProtectedRoute requiredRole="admin"`)
 - `/admin` dashboard · `/admin/users` · `/admin/creators` (+ `new`, `edit/:id`)
