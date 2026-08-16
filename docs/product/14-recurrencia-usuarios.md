@@ -229,6 +229,11 @@ este usuario en alguien con datos dentro del producto para siempre.
 Todo lo que se puede hacer, con esfuerzo estimado e impacto sobre la recurrencia
 del usuario no creador.
 
+> **Antes de leer esto como una lista de deseos:** la mayoría de estas palancas
+> se pueden construir **con lo que ya hay en el repositorio**, sin backend nuevo
+> ni servicios externos. Qué es composición y qué exige construir de verdad está
+> desglosado en [§8](#8-qué-se-puede-construir-ya-con-lo-que-hay).
+
 ### Nivel 0 · Arreglar lo que está roto
 
 | # | Palanca | Por qué | Esfuerzo |
@@ -276,7 +281,114 @@ del usuario no creador.
 
 ---
 
-## 8. El alta, rediseñada para la recurrencia
+## 8. Qué se puede construir ya, con lo que hay
+
+Buena parte de lo anterior **no necesita infraestructura nueva**: ni base de
+datos distinta, ni servidor, ni dependencias, ni proveedor externo. Es
+composición sobre piezas que ya están en el repositorio.
+
+Esta sección separa lo que es **componer** de lo que es **construir**, porque
+determina qué se puede tener esta semana y qué exige una decisión previa.
+
+### 8.1 · La propiedad que lo hace barato
+
+Dos hechos del código actual explican por qué tanto sale gratis:
+
+**① Todo el catálogo ya está en el cliente.** `useCreators` mantiene un
+`onSnapshot` sobre la colección **completa** de creadores — y los eventos viven
+dentro de esos documentos. Eso significa que cualquier derivación (cercanía,
+novedad, relacionados, lo de esta semana, densidad por ciudad) es **cálculo local
+sobre datos ya cargados**: cero lecturas extra, cero coste, cero backend.
+
+**② Los RSVP ya son consultables por usuario.** El documento guarda
+`{creatorId, eventIdx, userId, status, updatedAt}`. Una consulta con
+`where("userId", "==", uid)` devuelve todos los planes de una persona **sin
+cambiar nada del modelo de datos**.
+
+> ⚠️ **Con los ojos abiertos.** La propiedad ① es la misma que se rompe al
+> escalar ([`05`](./05-arquitectura-y-datos.md) §6): descargar la colección entera
+> deja de funcionar con miles de fichas. Es un superpoder **temporal**.
+> Aprovecharlo ahora es correcto; construir encima de él como si fuera permanente,
+> no. Cuando llegue la paginación, estas funciones habrá que reescribirlas — y
+> para entonces sabremos cuáles merecían la pena.
+
+### 8.2 · Inventario: qué tenemos y qué desbloquea
+
+| Activo que ya existe | Dónde | Qué desbloquea sin tocar backend |
+|---|---|---|
+| Colección de creadores completa en cliente | `useCreators` | Cercanía · nuevo desde tu última visita · relacionados · esta semana · densidad por ciudad |
+| `rsvps` consultable por `userId` | `useRsvps`, colección `rsvps` | **Mis planes** · historial de eventos pasados · «has rodado 4 veces con este colectivo» |
+| `creators.createdAt` / `updatedAt` | Escritos ya al guardar ficha | **«Actualizado hace X»** · orden por frescura · «nuevo esta semana» |
+| Helper `timeAgo()` ya escrito | `pages/admin/Dashboard.tsx` | El formateo de todo lo anterior, sin escribir una línea |
+| Backfill de timestamps antiguos | Botón ya existente en el dashboard | Fichas viejas sin fecha se pueden sellar de golpe |
+| `users.createdAt` (ISO, en el alta) | `AuthContext` | **Cohortes de alta y retorno a 90 días.** La métrica principal de §11 se puede calcular hoy |
+| `users.favorites` (array de ids) | Documento de usuario | Guardar eventos (segundo array) · listas con nombre (array → objeto). Sin colección nueva |
+| `localStorage` con patrón seguro | `UIContext` (tema) | **Guardar sin cuenta** reutilizando el mismo envoltorio a prueba de Safari privado |
+| `coordinates` en las fichas + Leaflet montado | `CreatorMap`, `geocode.ts` | **«Cerca de mí»** con la Geolocation API del navegador: sin servidor ni dependencia nueva |
+| `EventCalendar` con eventos ya cargados | `components/home` | **«Esta semana cerca de ti»** es un filtro sobre datos que ya están en memoria |
+| `EventAttendees` | `components/events` | **«Quién va»** ya está construido: suscribe RSVP y resuelve usuarios. Reutilizable como prueba social |
+| `creatorMeta` / `eventMeta` + template | `functions/` | Cualquier lista pública compartible hereda OG y SEO con el mecanismo existente |
+| `@dnd-kit/sortable` ya instalado | `GalleryManager` | Reordenar listas sin añadir dependencias |
+| `trackEvent` / `setUserProperties` | `lib/analytics.ts` | Instrumentar guardados, retorno y avisos: basta con llamar |
+| Diccionarios EN/ES con paridad | `i18n/` | Todo lo anterior bilingüe sin trabajo estructural |
+| Registro con Google ya funcionando | `AuthContext` | El camino corto del alta ya existe; solo hay que destacarlo |
+
+### 8.3 · Los diez movimientos sin infraestructura nueva
+
+Ordenados por lo que aportan a la recurrencia, no por facilidad. **Ninguno
+necesita email, servidor, servicio externo ni cambio de modelo de datos.**
+
+| # | Qué | Reutiliza | Esfuerzo |
+|---|---|---|---|
+| 1 | **«Mis planes»** — los RSVP del usuario, próximos y pasados | Consulta por `userId` sobre `rsvps` | S |
+| 2 | **Guardar eventos** además de creadores | Segundo array en el documento de usuario | S |
+| 3 | **Ocultar herramientas de creador** a quien no lo es | El `role` ya está en `AuthContext` | S |
+| 4 | **«Actualizado hace X»** en cada ficha | `updatedAt` + `timeAgo()` | S |
+| 5 | **«Nuevo desde tu última visita»** | `createdAt` de las fichas + una marca en `localStorage` | S |
+| 6 | **«Cerca de mí»** | `coordinates` + Geolocation del navegador | S |
+| 7 | **«Esta semana cerca de ti»** en la home | Filtro sobre los eventos ya cargados | M |
+| 8 | **«Añadir a mi calendario»** (`.ics`) | Generación de texto en cliente. Sustituye al recordatorio por email | S |
+| 9 | **Guardar sin cuenta** + migración al registrarse | Patrón de `localStorage` del tema | M |
+| 10 | **Listas con nombre** | El array de favoritos pasa a objeto | M |
+
+**Lo que significa esta tabla:** los cuatro arreglos del Nivel 0, más las señales
+de frescura, más la cercanía, más el calendario — **todo el bloque que más
+probablemente mueva la métrica de retorno a 90 días** — se puede construir sin
+gastar un euro en infraestructura y sin tomar ninguna de las decisiones abiertas
+pendientes.
+
+El punto 8 merece un apunte: **el fichero `.ics` sustituye funcionalmente al
+recordatorio por email** mientras no haya proveedor de correo. El recordatorio lo
+da el calendario del propio usuario, que es donde ya mira. Es la solución de
+menor coste y menor fricción a lo que hoy es el hueco más caro del bucle de D3.
+
+### 8.4 · Dónde sí hace falta algo nuevo
+
+Frontera honesta. Estas no son composición y no se pueden improvisar:
+
+| Palanca | Qué exige | Decisión previa |
+|---|---|---|
+| Recordatorios y resúmenes por email | Proveedor transaccional, plantillas, gestión de bajas | **A2** en [`11`](./11-decisiones.md) |
+| Notificaciones push | Service worker, PWA instalable, permisos | Ninguna, pero es trabajo real |
+| Alertas por ciudad y categoría | Almacenar preferencias + proceso programado | Depende del email |
+| Suscripción al calendario por ciudad | Endpoint que sirva un `.ics` dinámico | Ninguna |
+| Búsqueda de texto real | Servicio dedicado o índice derivado | **A9** en [`11`](./11-decisiones.md) |
+| Diario de la bici | Modelo de datos nuevo y su propia interfaz | ADR nuevo |
+
+### 8.5 · La lectura de esta sección
+
+> **No hay ninguna excusa de infraestructura.** El primer tramo de la estrategia
+> de recurrencia —el que arregla lo roto, da valor almacenado y hace visible la
+> novedad— está construible con lo que ya hay en el repositorio, en cuestión de
+> semanas y sin dependencias externas.
+>
+> La infraestructura nueva (email, push) hace falta para la **Fase 3** en
+> adelante. Empezar por ahí sería construir el canal antes de tener algo que
+> contar por él.
+
+---
+
+## 9. El alta, rediseñada para la recurrencia
 
 Hoy el registro pide nombre, apellidos, email y contraseña. **No pide nada que
 permita volver a contactar con sentido.**
@@ -298,7 +410,7 @@ se puede enviar ninguno.
 
 ---
 
-## 9. Reglas de los avisos
+## 10. Reglas de los avisos
 
 Cualquier canal de contacto es un préstamo de atención. Estas reglas lo protegen.
 
@@ -322,7 +434,7 @@ se manda.
 
 ---
 
-## 10. Cómo se mide
+## 11. Cómo se mide
 
 ### Definición de usuario activo
 
@@ -363,7 +475,7 @@ de aviso. Es trabajo de esfuerzo pequeño y desbloquea todo lo demás.
 
 ---
 
-## 11. Qué no vamos a hacer
+## 12. Qué no vamos a hacer
 
 | Idea | Por qué no |
 |---|---|
@@ -378,7 +490,7 @@ de aviso. Es trabajo de esfuerzo pequeño y desbloquea todo lo demás.
 
 ---
 
-## 12. Plan por fases
+## 13. Plan por fases
 
 ### Fase 1 · Cerrar el agujero *(semanas, esfuerzo S)*
 Nivel 0 completo: mis planes, guardar eventos, ocultar herramientas de creador,
@@ -388,15 +500,23 @@ documento de usuario.
 **Cómo sabemos que funcionó:** existe por primera vez una medición de retorno a
 90 días.
 
+✅ **Sin infraestructura nueva.** Todo con lo que ya hay ([§8](#8-qué-se-puede-construir-ya-con-lo-que-hay)).
+
 ### Fase 2 · Dar algo que perder *(1–2 meses)*
 Guardar sin cuenta · listas con nombre · "nuevo desde tu última visita" ·
-las dos preguntas del alta.
+"actualizado hace X" · "cerca de mí" · las dos preguntas del alta.
 
 **Objetivo:** > 40% de usuarios con al menos un elemento guardado.
 
+✅ **Sin infraestructura nueva.** Sigue siendo composición sobre lo existente.
+
 ### Fase 3 · Ganarse el derecho a avisar *(2–3 meses)*
-Recordatorios de evento · exportar a calendario · alertas por ciudad y categoría,
-con todas las reglas de §9.
+Exportar a calendario (`.ics`) primero — no necesita nada. Después recordatorios
+de evento y alertas por ciudad y categoría, con todas las reglas de §10.
+
+⚠️ **Aquí aparece la primera dependencia externa:** el proveedor de email
+(decisión abierta A2). El `.ics` permite empezar sin él y cubrir el hueco
+principal del bucle de D3 mientras se decide.
 
 **Objetivo:** > 30% suscritos, bajas por debajo del 2%, asistencia sobre RSVP
 por encima del 60%.
@@ -414,7 +534,7 @@ con datos propios dentro del producto.
 
 ---
 
-## 13. La idea en una frase
+## 14. La idea en una frase
 
 > No hay que hacer que la gente vuelva más. Hay que **darles algo que sea suyo**
 > y **avisarles solo cuando de verdad importa**. Con esta comunidad, lo primero
