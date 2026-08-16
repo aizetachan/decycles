@@ -218,6 +218,7 @@ No dependes de recordar la conversación. Dependes de estos documentos:
 - **Con qué formato escribimos** → [`10-plantillas.md`](./10-plantillas.md)
 - **Por qué es como es** → [`11-decisiones.md`](./11-decisiones.md)
 - **Cómo está hoy y por dónde seguir** → [`12-estado-actual.md`](./12-estado-actual.md)
+- **Qué más podría hacerse** → [`13-espacio-de-oportunidad.md`](./13-espacio-de-oportunidad.md)
 
 **Al retomar el proyecto tras un tiempo fuera, lee el `12` primero.** Y al
 terminar una sesión de trabajo con cambios relevantes, **actualízalo**.

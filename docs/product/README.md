@@ -50,6 +50,7 @@ un documento que no se actualiza es peor que no tenerlo.
 | 10 | [Plantillas de trabajo](./10-plantillas.md) | ¿Con qué formato escribimos PRDs, specs, experimentos? |
 | 11 | [Registro de decisiones (ADR)](./11-decisiones.md) | ¿Por qué el producto es como es? |
 | 12 | [Estado actual y cómo retomar](./12-estado-actual.md) | ¿Qué me encuentro hoy y por dónde sigo? |
+| 13 | [Espacio de oportunidad](./13-espacio-de-oportunidad.md) | ¿Qué más podría aportar valor, sin filtrar por dificultad? |
 
 > **¿Vuelves al proyecto después de un tiempo fuera?** Empieza por el
 > [12](./12-estado-actual.md). Es el documento de relevo: dice qué hay en
