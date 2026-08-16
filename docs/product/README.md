@@ -49,6 +49,12 @@ un documento que no se actualiza es peor que no tenerlo.
 | 09 | [Operativa: curación, moderación, growth](./09-operativa.md) | ¿Cómo se opera el día a día? |
 | 10 | [Plantillas de trabajo](./10-plantillas.md) | ¿Con qué formato escribimos PRDs, specs, experimentos? |
 | 11 | [Registro de decisiones (ADR)](./11-decisiones.md) | ¿Por qué el producto es como es? |
+| 12 | [Estado actual y cómo retomar](./12-estado-actual.md) | ¿Qué me encuentro hoy y por dónde sigo? |
+
+> **¿Vuelves al proyecto después de un tiempo fuera?** Empieza por el
+> [12](./12-estado-actual.md). Es el documento de relevo: dice qué hay en
+> producción, qué está bloqueado, qué no sabemos y cuál es el siguiente paso
+> según el tiempo que tengas.
 
 ---
 

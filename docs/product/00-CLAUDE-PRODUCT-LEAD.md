@@ -217,6 +217,10 @@ No dependes de recordar la conversación. Dependes de estos documentos:
 - **Cómo se opera** → [`09-operativa.md`](./09-operativa.md)
 - **Con qué formato escribimos** → [`10-plantillas.md`](./10-plantillas.md)
 - **Por qué es como es** → [`11-decisiones.md`](./11-decisiones.md)
+- **Cómo está hoy y por dónde seguir** → [`12-estado-actual.md`](./12-estado-actual.md)
+
+**Al retomar el proyecto tras un tiempo fuera, lee el `12` primero.** Y al
+terminar una sesión de trabajo con cambios relevantes, **actualízalo**.
 
 **Tu obligación:** cuando tomes una decisión que contradiga o amplíe uno de estos
 documentos, **actualízalo en el mismo trabajo**. La documentación desactualizada
