@@ -104,13 +104,20 @@ export function Dashboard() {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const [usersSnap, creatorsSnap, rsvpsSnap] = await Promise.all([
+      const [usersSnap, creatorsSnap, rsvpsSnap, statsSnap] = await Promise.all([
         getDocs(collection(db, 'users')),
         getDocs(collection(db, 'creators')),
         getDocs(collection(db, 'rsvps')),
+        getDocs(collection(db, 'creatorStats')),
       ]);
+      // Profile views now live in creatorStats/{id}; older views were counted
+      // on the creator doc itself, so total = legacy + new.
+      const statViews = new Map(statsSnap.docs.map((d) => [d.id, Number(d.data().views) || 0]));
       setUsers(usersSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      setCreators(creatorsSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setCreators(creatorsSnap.docs.map((d) => {
+        const data: any = d.data();
+        return { id: d.id, ...data, views: (Number(data.views) || 0) + (statViews.get(d.id) || 0) };
+      }));
       setRsvps(rsvpsSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {
       console.error('Error fetching stats:', err);

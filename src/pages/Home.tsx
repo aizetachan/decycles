@@ -66,12 +66,12 @@ export function Home() {
   // no progressive image flash as cards mount. Errors count as "done" so a
   // single broken image doesn't hang the whole gate. An 8s safety timeout
   // releases the gate unconditionally as a fallback.
+  // FIRST LOAD ONLY: once the grid has been shown, live (onSnapshot) updates
+  // just update it in place. Re-arming the gate on every snapshot blanked the
+  // whole explore grid for every open visitor whenever any creator doc changed.
   const [imagesReady, setImagesReady] = useState(false);
   useEffect(() => {
-    if (creatorsLoading) {
-      setImagesReady(false);
-      return;
-    }
+    if (imagesReady || creatorsLoading) return;
     const urls = (creators || [])
       .map((c) => c.coverImage)
       .filter((u): u is string => !!u);
@@ -79,7 +79,6 @@ export function Home() {
       setImagesReady(true);
       return;
     }
-    setImagesReady(false);
     let loaded = 0;
     let cancelled = false;
     const onDone = () => {
@@ -107,7 +106,7 @@ export function Home() {
       cancelled = true;
       window.clearTimeout(safety);
     };
-  }, [creators, creatorsLoading]);
+  }, [creators, creatorsLoading, imagesReady]);
 
   const [activeCategory, setActiveCategory] = useState<Category>("All");
   const [activeProductCategory, setActiveProductCategory] = useState<Category | null>(null);
