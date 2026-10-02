@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Globe, MapPin, Maximize2, Heart, Share2, Check, Loader2 } from "lucide-react";
-import { doc, getDoc, updateDoc, increment } from "firebase/firestore";
+import { doc, getDoc, setDoc, increment } from "firebase/firestore";
 import { creators as seedCreators } from "../../data";
 import { useUI } from "../../contexts/UIContext";
 import { useAuth } from "../../contexts/AuthContext";
@@ -124,9 +124,12 @@ export function CreatorProfileModal() {
     });
 
     // Count the view on real creator docs only (skip the "current-user" self
-    // preview). Best-effort — never block the UI on the counter.
+    // preview). Best-effort — never block the UI on the counter. Stored in
+    // creatorStats/{id}, NOT on the creator doc: the home page live-listens to
+    // the whole `creators` collection, so bumping a counter there pushed an
+    // update to every open visitor on every profile view.
     if (realId && realId !== "current-user") {
-      updateDoc(doc(db, "creators", realId), { views: increment(1) }).catch(() => {});
+      setDoc(doc(db, "creatorStats", realId), { views: increment(1) }, { merge: true }).catch(() => {});
     }
   }, [selectedCreator?.id, selectedCreatorId, currentUser?.uid]);
 
