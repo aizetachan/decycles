@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, User, Briefcase, Eye, EyeOff } from 'lucide-react';
+import { X, User, Briefcase } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useUI, JoinModalMode } from '../../contexts/UIContext';
 import { useT } from '../../contexts/LanguageContext';
 import { trackEvent } from "../../lib/analytics";
+import { PasswordInput, EMAIL_INPUT_PROPS } from '../auth/PasswordInput';
 
 interface JoinModalProps {
   isOpen: boolean;
@@ -18,8 +19,8 @@ const FRIENDLY_AUTH_ERRORS: Record<string, string> = {
   'auth/invalid-email': 'That email address looks invalid.',
   'auth/weak-password': 'Password is too weak — pick something at least 6 characters long.',
   'auth/user-not-found': 'No account with that email. Sign up first.',
-  'auth/wrong-password': 'Wrong password. Try again or reset it.',
-  'auth/invalid-credential': 'Email or password is wrong.',
+  'auth/wrong-password': 'Wrong password. Passwords are case-sensitive — check capital letters, or reset it.',
+  'auth/invalid-credential': 'Email or password is wrong. Passwords are case-sensitive — check capital letters, or reset it.',
   'auth/popup-closed-by-user': 'Google sign-in was cancelled.',
 };
 
@@ -28,6 +29,9 @@ const friendly = (err: any): string => {
   if (code && FRIENDLY_AUTH_ERRORS[code]) return FRIENDLY_AUTH_ERRORS[code];
   return err?.message || 'Something went wrong. Try again.';
 };
+
+// Firebase's own minimum; checked client-side so the confirm step fails fast.
+const MIN_PASSWORD_LENGTH = 6;
 
 export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, isDarkMode }) => {
   const { signup, login, loginWithGoogle, requestPasswordReset } = useAuth();
@@ -42,6 +46,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, isDarkMod
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   // Local sub-mode: when true, sign-in is showing the "forgot password" form.
@@ -69,6 +74,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, isDarkMod
     setFirstName('');
     setLastName('');
     setPassword('');
+    setConfirmPassword('');
     setShowPassword(false);
     setErrorMsg(null);
     setIsForgot(false);
@@ -98,7 +104,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, isDarkMod
     setErrorMsg(null);
     setStatus('submitting');
     try {
-      await requestPasswordReset(email);
+      await requestPasswordReset(email.trim());
     } catch (err: any) {
       // Swallow user-not-found / invalid-email-shape on purpose.
       // Only surface unexpected errors (network / quota).
@@ -115,10 +121,20 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, isDarkMod
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+    // Catch typos (or anything a keyboard altered) before the account is
+    // created with a password the user doesn't know they have.
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setErrorMsg(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+      return;
+    }
+    if (password !== confirmPassword) {
+      setErrorMsg("Passwords don't match.");
+      return;
+    }
     setStatus('submitting');
     try {
       const type = joinType || 'user';
-      await signup(email, password, firstName, lastName, type);
+      await signup(email.trim(), password, firstName, lastName, type);
       setStatus('success');
       trackEvent("sign_up", {
         method: "email",
@@ -140,7 +156,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, isDarkMod
     setErrorMsg(null);
     setStatus('submitting');
     try {
-      await login(email, password);
+      await login(email.trim(), password);
       setStatus('success');
       trackEvent("login", {
         method: "email",
@@ -257,7 +273,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, isDarkMod
               <div>
                 <label className={labelClass}>{t("join.email")}</label>
                 <input
-                  type="email"
+                  {...EMAIL_INPUT_PROPS}
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -384,7 +400,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, isDarkMod
               <div>
                 <label className={labelClass}>{t("join.email")}</label>
                 <input
-                  type="email"
+                  {...EMAIL_INPUT_PROPS}
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -393,29 +409,17 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, isDarkMod
               </div>
               <div>
                 <label className={labelClass}>{t("join.password")}</label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    // `normal-case` overrides the global `uppercase` in inputClass —
-                    // passwords are case-sensitive and showing them via the eye
-                    // toggle must reflect what the user actually typed.
-                    className={`${inputClass} pr-10 normal-case`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    title={showPassword ? 'Hide password' : 'Show password'}
-                    className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 transition-opacity ${
-                      isDarkMode ? 'text-white/60 hover:text-white' : 'text-black/50 hover:text-black'
-                    }`}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
+                <PasswordInput
+                  value={password}
+                  onChange={setPassword}
+                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                  name="password"
+                  minLength={mode === 'signup' ? MIN_PASSWORD_LENGTH : undefined}
+                  show={showPassword}
+                  onShowChange={setShowPassword}
+                  isDarkMode={isDarkMode}
+                  className={inputClass}
+                />
                 {mode === 'signin' && (
                   <div className="mt-2 text-right">
                     <button
@@ -428,6 +432,22 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose, isDarkMod
                   </div>
                 )}
               </div>
+              {mode === 'signup' && (
+                <div>
+                  <label className={labelClass}>Confirm password</label>
+                  <PasswordInput
+                    value={confirmPassword}
+                    onChange={setConfirmPassword}
+                    autoComplete="new-password"
+                    name="confirm-password"
+                    minLength={MIN_PASSWORD_LENGTH}
+                    show={showPassword}
+                    hideToggle
+                    isDarkMode={isDarkMode}
+                    className={inputClass}
+                  />
+                </div>
+              )}
             </div>
 
             {errorMsg && (
