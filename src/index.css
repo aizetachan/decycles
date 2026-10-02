@@ -99,6 +99,8 @@ body.dark {
   background: transparent !important;
   color: var(--color-rad-black) !important;
   text-shadow: 0 0 2px rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+  opacity: 0.6;
 }
 .leaflet-control-attribution a {
   color: var(--color-rad-black) !important;

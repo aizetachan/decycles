@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import { GestureHandling } from "leaflet-gesture-handling";
 import "leaflet-gesture-handling/dist/leaflet-gesture-handling.css";
@@ -7,6 +7,8 @@ import { Creator } from "../../types";
 import { useUI } from "../../contexts/UIContext";
 import { trackEvent } from "../../lib/analytics";
 import { EVENT_CATEGORY_COLORS } from "../../constants/categories";
+import { MAP_STYLE_DARK, MAP_STYLE_LIGHT } from "../../lib/mapStyles";
+import { VectorBasemap } from "./VectorBasemap";
 
 // Register two-finger / Ctrl+wheel gesture handling once at module load.
 // Behaviour: 1-finger touch scrolls the page; 2-finger pans/zooms the map.
@@ -36,11 +38,12 @@ const eventIcon = (color: string) =>
 
 export function CreatorMap({ isDarkMode, filteredCreators, eventCreators }: CreatorMapProps) {
   const { openCreatorProfile, openEvent } = useUI();
-  // Events now carry their own geocoded coordinates (set from the event's own
-  // address in the editor), so they pin at their real venue. Shown by default;
-  // the toggle still lets visitors hide the event layer. Events without their
-  // own coordinates fall back to the parent shop's pin.
-  const [showEvents, setShowEvents] = useState(true);
+  // The map shows one layer at a time: creators (default) or events. Events
+  // carry their own geocoded coordinates (set from the event's own address in
+  // the editor), so they pin at their real venue; events without their own
+  // coordinates fall back to the parent shop's pin.
+  const [layer, setLayer] = useState<"creators" | "events">("creators");
+  const showEvents = layer === "events";
 
   // Flatten the nested events into a single marker list with a resolved
   // coordinate (event coords > shop coords). Uses `eventCreators` so events
@@ -71,25 +74,17 @@ export function CreatorMap({ isDarkMode, filteredCreators, eventCreators }: Crea
 
   return (
     <div className={`relative h-[600px] w-full brutalist-border brutalist-shadow ${isDarkMode ? "bg-black" : "bg-white"}`}>
-      {/* Toggle — shows / hides the event-marker layer. Sits above the map. */}
+      {/* Toggle — switches the map between creators and events. The label
+          names the layer you'll switch TO. Sits above the map. */}
       <div className="absolute top-3 right-3 z-[400] flex items-center">
         <button
           type="button"
-          onClick={() => setShowEvents((v) => !v)}
-          className={`flex items-center gap-2 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border-2 brutalist-shadow transition-colors ${
-            showEvents
-              ? isDarkMode
-                ? "bg-white text-black border-white"
-                : "bg-black text-white border-black"
-              : isDarkMode
-              ? "bg-black/80 text-white border-white backdrop-blur"
-              : "bg-white/80 text-black border-black backdrop-blur"
+          onClick={() => setLayer(showEvents ? "creators" : "events")}
+          className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border-2 brutalist-shadow transition-colors ${
+            isDarkMode ? "bg-white text-black border-white" : "bg-black text-white border-black"
           }`}
-          aria-pressed={showEvents}
         >
-          <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
-          {showEvents ? "Hide events" : "Show events"}
-          <span className="opacity-60">({eventMarkers.length})</span>
+          {showEvents ? "Creators" : "Events"}
         </button>
       </div>
 
@@ -103,11 +98,8 @@ export function CreatorMap({ isDarkMode, filteredCreators, eventCreators }: Crea
         style={{ height: '100%', width: '100%', zIndex: 0 }}
         {...({ gestureHandling: true } as any)}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url={isDarkMode ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"}
-        />
-        {filteredCreators.map(creator => creator.coordinates && (
+        <VectorBasemap style={isDarkMode ? MAP_STYLE_DARK : MAP_STYLE_LIGHT} />
+        {!showEvents && filteredCreators.map(creator => creator.coordinates && (
           <Marker key={creator.id} position={creator.coordinates}>
             <Popup className={isDarkMode ? "dark-popup" : ""}>
               <div className="flex flex-col gap-2 min-w-[200px]">
