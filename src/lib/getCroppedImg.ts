@@ -5,7 +5,7 @@
  * - EXIF orientation is baked in (same as compressImage), so portrait phone
  *   photos crop with the same orientation the user saw in the cropper.
  * - Output is lossless PNG on purpose: the existing compressImage step
- *   downscales to 1600px and re-encodes to WebP, so we avoid double lossy
+ *   downscales to 1600px and re-encodes (WebP; JPEG/PNG on Safari), so we avoid double lossy
  *   compression by keeping this intermediate lossless.
  */
 
