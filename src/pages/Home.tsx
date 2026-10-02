@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Search, MapPin, Menu, X, ChevronDown, Globe, ExternalLink, Moon, Sun, Map, Grid, Upload, ChevronLeft, ChevronRight, Eye, User, Briefcase, Maximize2, Package, Wrench, Calendar, Users, Palette, Plus, Tag, Bike } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -19,11 +19,15 @@ import { FiltersBottomSheet } from "../components/home/FiltersBottomSheet";
 import { useCategories } from "../contexts/CategoriesContext";
 import { CreatorGrid } from "../components/home/CreatorGrid";
 import { trackEvent } from "../lib/analytics";
-import { CreatorMap } from "../components/home/CreatorMap";
 import { EventCalendar } from "../components/home/EventCalendar";
 import { Category, SubCategory, Creator } from "../types";
 import { useCreators } from "../hooks/useCreators";
 import { orderCreators } from "../lib/creatorOrdering";
+
+// Lazy: the map pulls in MapLibre (~1 MB), only needed when the map view opens.
+const CreatorMap = lazy(() =>
+  import("../components/home/CreatorMap").then((m) => ({ default: m.CreatorMap })),
+);
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -761,11 +765,15 @@ export function Home() {
                   setSelectedCreator={setSelectedCreator}
                 />
               ) : (
-                <CreatorMap
-                  isDarkMode={isDarkMode}
-                  filteredCreators={filteredCreators}
-                  eventCreators={eventMapCreators}
-                />
+                <Suspense
+                  fallback={<div className={`h-[600px] w-full brutalist-border brutalist-shadow ${isDarkMode ? "bg-black" : "bg-white"}`} />}
+                >
+                  <CreatorMap
+                    isDarkMode={isDarkMode}
+                    filteredCreators={filteredCreators}
+                    eventCreators={eventMapCreators}
+                  />
+                </Suspense>
               )}
 
               {filteredCreators.length === 0 && (
