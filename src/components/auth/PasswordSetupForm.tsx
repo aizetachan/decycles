@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { PasswordInput } from "./PasswordInput";
 
 interface PasswordSetupFormProps {
   isDarkMode: boolean;
@@ -25,16 +25,11 @@ export const PasswordSetupForm: React.FC<PasswordSetupFormProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Passwords are case-sensitive — no `uppercase` transform here, otherwise
-  // toggling "show password" would misrepresent what the user actually typed.
-  const inputClass = `w-full px-4 py-2 border focus:outline-none text-sm font-bold normal-case tracking-wider ${
+  const inputClass = `w-full px-4 py-2 border focus:outline-none text-sm font-bold tracking-wider ${
     isDarkMode ? "bg-black text-white border-white/30" : "bg-white text-black border-black/20"
-  } pr-10`;
+  }`;
   const labelClass = `block text-xs font-bold uppercase tracking-widest mb-1 ${
     isDarkMode ? "text-gray-300" : "text-gray-700"
-  }`;
-  const eyeBtnClass = `absolute right-2 top-1/2 -translate-y-1/2 p-1.5 transition-opacity ${
-    isDarkMode ? "text-white/60 hover:text-white" : "text-black/50 hover:text-black"
   }`;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -62,40 +57,33 @@ export const PasswordSetupForm: React.FC<PasswordSetupFormProps> = ({
     <form className="space-y-4" onSubmit={handleSubmit}>
       <div>
         <label className={labelClass}>New password</label>
-        <div className="relative">
-          <input
-            type={show ? "text" : "password"}
-            required
-            minLength={MIN_LENGTH}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={inputClass}
-            disabled={disabled || submitting}
-          />
-          <button
-            type="button"
-            onClick={() => setShow((v) => !v)}
-            aria-label={show ? "Hide password" : "Show password"}
-            title={show ? "Hide password" : "Show password"}
-            className={eyeBtnClass}
-          >
-            {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
-        </div>
+        <PasswordInput
+          value={password}
+          onChange={setPassword}
+          autoComplete="new-password"
+          name="new-password"
+          minLength={MIN_LENGTH}
+          show={show}
+          onShowChange={setShow}
+          disabled={disabled || submitting}
+          isDarkMode={isDarkMode}
+          className={inputClass}
+        />
       </div>
       <div>
         <label className={labelClass}>Confirm new password</label>
-        <div className="relative">
-          <input
-            type={show ? "text" : "password"}
-            required
-            minLength={MIN_LENGTH}
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            className={inputClass}
-            disabled={disabled || submitting}
-          />
-        </div>
+        <PasswordInput
+          value={confirm}
+          onChange={setConfirm}
+          autoComplete="new-password"
+          name="confirm-new-password"
+          minLength={MIN_LENGTH}
+          show={show}
+          hideToggle
+          disabled={disabled || submitting}
+          isDarkMode={isDarkMode}
+          className={inputClass}
+        />
       </div>
 
       {error && (
