@@ -65,7 +65,15 @@ Decisión de formato: **WebP** (no AVIF por complejidad/velocidad de encode, no
 
 ## ⏳ Pendiente
 
-### B) Re-comprimir las imágenes que los usuarios YA subieron a Storage
+### B) ✅ HECHO (04-oct-2026) — Re-comprimir las imágenes que los usuarios YA subieron a Storage
+
+> Ejecutado con la versión segura del script: 294 imágenes, 883 MB → 66 MB,
+> 73 docs actualizados, 0 referencias rotas. Las 6 HEIC (que `sharp` no lee)
+> se convirtieron aparte con `sips`. También se corrigió que Safari subiera
+> los originales sin comprimir (fallback JPEG/PNG en `imageCompression.ts`).
+> Lo que queda (copia `_backup_pre_webp_20260627/`) está en `docs/BACKLOG.md`.
+>
+> Texto original del plan, para referencia:
 Las subidas **antiguas** (anteriores a la compresión en cliente) siguen pesadas
 en el bucket de Firebase Storage y referenciadas desde Firestore. Hay un script
 listo pero **no ejecutado** porque requiere credenciales de admin.
@@ -110,5 +118,7 @@ listo pero **no ejecutado** porque requiere credenciales de admin.
 | Assets del repo → WebP | ✅ hecho | `assets/`, `scripts/optimize-assets.cjs` |
 | Compresión de subidas (cliente) | ✅ hecho | `src/lib/imageCompression.ts`, `src/lib/upload.ts` |
 | Lazy loading | ✅ hecho | componentes `.tsx` |
-| Backlog de Storage (punto B) | ⏳ pendiente — falta `serviceAccountKey.json` | `scripts/optimize-storage-images.cjs` |
-| Deploy a producción | ⏳ pendiente — falta credencial Firebase | `npm run deploy` |
+| Backlog de Storage (punto B) | ✅ hecho 04-oct-2026 (883 MB → 66 MB) | `scripts/optimize-storage-images.cjs` |
+| Compresión en Safari (sin WebP) | ✅ hecho — fallback JPEG/PNG | `src/lib/imageCompression.ts` |
+| Copia `_backup_pre_webp_20260627/` | ⏳ pendiente de decisión | `docs/BACKLOG.md` |
+| Deploy a producción | ✅ hecho (solo hosting, ver `docs/BACKLOG.md` punto 4) | `firebase deploy --only hosting` |
