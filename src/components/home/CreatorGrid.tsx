@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Creator } from "../../types";
+import { CREATOR_DEFAULT_AVATAR } from "../../lib/defaultAvatars";
 
 // Shared with CreatorGridSkeleton so the loading placeholders match the real
 // cards exactly (no layout jump when the grid swaps in).
@@ -11,6 +12,9 @@ export const creatorCardMediaClass = (isDarkMode: boolean) =>
   `relative aspect-[4/3] overflow-hidden ${isDarkMode ? "bg-zinc-900" : "bg-gray-100"}`;
 export const creatorCardBodyClass = (isDarkMode: boolean) =>
   `flex flex-col p-3 sm:p-4 ${isDarkMode ? "bg-zinc-900" : "bg-gray-50"}`;
+// Avatar beside the name. Sized to fit inside the title+location block so it
+// never changes the card height (skeleton uses the same size).
+export const CREATOR_CARD_AVATAR_SIZE = "w-8 h-8 sm:w-10 sm:h-10";
 
 // Cover image that fades in over a shimmering placeholder, so a card scrolled
 // into view before its image arrives never shows an empty box.
@@ -84,7 +88,21 @@ export function CreatorGrid({ isDarkMode, filteredCreators, setSelectedCreator }
                 wraps both the image and the content as a single frame. */}
             <div className={creatorCardBodyClass(isDarkMode)}>
               {/* Header with Title and Location */}
-              <div className="flex items-start justify-between gap-2 sm:gap-4 mb-1 sm:mb-2 content-fade-in">
+              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2 content-fade-in">
+                <img
+                  src={creator.profileImage || CREATOR_DEFAULT_AVATAR}
+                  alt=""
+                  className={`${CREATOR_CARD_AVATAR_SIZE} shrink-0 rounded-full object-cover border ${
+                    isDarkMode ? "border-white/20 bg-zinc-800" : "border-black/20 bg-gray-200"
+                  }`}
+                  referrerPolicy="no-referrer"
+                  loading="lazy"
+                  decoding="async"
+                  onError={(e) => {
+                    const img = e.currentTarget;
+                    if (!img.src.endsWith(CREATOR_DEFAULT_AVATAR)) img.src = CREATOR_DEFAULT_AVATAR;
+                  }}
+                />
                 <div className="flex flex-col gap-0.5 sm:gap-1 min-w-0">
                   <h3 className={`text-base sm:text-xl font-display uppercase tracking-wide transition-colors line-clamp-1 ${isDarkMode ? "text-white group-hover:text-gray-300" : "text-black group-hover:text-gray-600"}`}>
                     {creator.name}
