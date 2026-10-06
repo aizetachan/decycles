@@ -2,6 +2,7 @@ import React from "react";
 import { Bike } from "lucide-react";
 import { motion } from "motion/react";
 import {
+  CREATOR_CARD_AVATAR_SIZE,
   CREATOR_GRID_CLASS,
   creatorCardBodyClass,
   creatorCardClass,
@@ -38,12 +39,15 @@ export function CreatorGridSkeleton({ isDarkMode, label, variant = "grid" }: Cre
                 {/* Each bar sits in a box with the exact line height of the
                     real title (text-base / sm:text-xl) and location
                     (9px / sm:10px × 1.5), so the card height matches 1:1. */}
-                <div className="flex flex-col gap-0.5 sm:gap-1 mb-1 sm:mb-2">
-                  <div className="h-6 sm:h-7 flex items-center">
-                    <div className={`h-3.5 sm:h-5 w-3/4 skeleton-shimmer ${bar}`} />
-                  </div>
-                  <div className="h-[13.5px] sm:h-[15px] flex items-center">
-                    <div className={`h-2 sm:h-2.5 w-1/3 skeleton-shimmer ${bar}`} />
+                <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                  <div className={`${CREATOR_CARD_AVATAR_SIZE} shrink-0 rounded-full skeleton-shimmer ${bar}`} />
+                  <div className="flex flex-col gap-0.5 sm:gap-1 flex-1 min-w-0">
+                    <div className="h-6 sm:h-7 flex items-center">
+                      <div className={`h-3.5 sm:h-5 w-3/4 skeleton-shimmer ${bar}`} />
+                    </div>
+                    <div className="h-[13.5px] sm:h-[15px] flex items-center">
+                      <div className={`h-2 sm:h-2.5 w-1/3 skeleton-shimmer ${bar}`} />
+                    </div>
                   </div>
                 </div>
               </div>
