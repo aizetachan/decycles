@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, MapPin, Menu, X, ChevronDown, Globe, ExternalLink, Moon, Sun, Map, Grid, Upload, ChevronLeft, ChevronRight, Eye, User, Briefcase, Maximize2, Package, Wrench, Calendar, Users, Palette, Plus, Tag, Bike } from "lucide-react";
+import { Search, MapPin, Menu, X, ChevronDown, Globe, ExternalLink, Moon, Sun, Map, Grid, Upload, ChevronLeft, ChevronRight, Eye, User, Briefcase, Maximize2, Package, Wrench, Calendar, Users, Palette, Plus, Tag } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "../contexts/AuthContext";
 import { useUI } from "../contexts/UIContext";
@@ -18,6 +18,7 @@ import { SubcategoryFilter } from "../components/home/SubcategoryFilter";
 import { FiltersBottomSheet } from "../components/home/FiltersBottomSheet";
 import { useCategories } from "../contexts/CategoriesContext";
 import { CreatorGrid } from "../components/home/CreatorGrid";
+import { CreatorGridSkeleton } from "../components/home/CreatorGridSkeleton";
 import { trackEvent } from "../lib/analytics";
 import { EventCalendar } from "../components/home/EventCalendar";
 import { Category, SubCategory, Creator } from "../types";
@@ -49,6 +50,25 @@ type FilterItem = SubCategory | FilterGroup;
 // stable across renders (safe as a useMemo dependency).
 const FEATURED_CREATOR_IDS: string[] = [];
 
+// Explore loading: covers that must be ready before the grid shows (≈ first
+// screen at xl: 3 rows × 4), and how many to warm in parallel afterwards.
+const FIRST_SCREEN_COVERS = 12;
+const BACKGROUND_PRELOAD_CONCURRENCY = 4;
+
+/** Resolves when the image has loaded or failed (never rejects). */
+function preloadImage(url: string): Promise<void> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = img.onerror = () => resolve();
+    try {
+      img.referrerPolicy = "no-referrer";
+    } catch {
+      img.setAttribute("referrerpolicy", "no-referrer");
+    }
+    img.src = url;
+  });
+}
+
 const getViews = (creator: Creator) => {
   if (creator.views !== undefined) return creator.views;
   let hash = 0;
@@ -61,52 +81,8 @@ const getViews = (creator: Creator) => {
 export function Home() {
   const { t } = useT();
   const { creators, loading: creatorsLoading } = useCreators();
-  // Cover-image preload: keep the loading state on until every creator's
-  // cover image has finished decoding so the grid pops in fully rendered —
-  // no progressive image flash as cards mount. Errors count as "done" so a
-  // single broken image doesn't hang the whole gate. An 8s safety timeout
-  // releases the gate unconditionally as a fallback.
-  // FIRST LOAD ONLY: once the grid has been shown, live (onSnapshot) updates
-  // just update it in place. Re-arming the gate on every snapshot blanked the
-  // whole explore grid for every open visitor whenever any creator doc changed.
+  // Explore loading gate — see the cover preload effect below `filteredCreators`.
   const [imagesReady, setImagesReady] = useState(false);
-  useEffect(() => {
-    if (imagesReady || creatorsLoading) return;
-    const urls = (creators || [])
-      .map((c) => c.coverImage)
-      .filter((u): u is string => !!u);
-    if (urls.length === 0) {
-      setImagesReady(true);
-      return;
-    }
-    let loaded = 0;
-    let cancelled = false;
-    const onDone = () => {
-      loaded += 1;
-      if (!cancelled && loaded >= urls.length) setImagesReady(true);
-    };
-    urls.forEach((u) => {
-      const img = new Image();
-      img.onload = onDone;
-      img.onerror = onDone;
-      try {
-        img.referrerPolicy = "no-referrer";
-      } catch (e) {
-        // Fallback for older browsers where referrerPolicy might be read-only or unsupported
-        try {
-          img.setAttribute("referrerpolicy", "no-referrer");
-        } catch (err) {}
-      }
-      img.src = u;
-    });
-    const safety = window.setTimeout(() => {
-      if (!cancelled) setImagesReady(true);
-    }, 8000);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(safety);
-    };
-  }, [creators, creatorsLoading, imagesReady]);
 
   const [activeCategory, setActiveCategory] = useState<Category>("All");
   const [activeProductCategory, setActiveProductCategory] = useState<Category | null>(null);
@@ -446,6 +422,65 @@ export function Home() {
     );
   });
 
+  // Cover preload, in two phases:
+  //  1) GATE — only the first screen of cards (in display order) must finish
+  //     loading before the grid replaces the skeleton. Waiting for every cover
+  //     (~140) made the first paint slow and defeated lazy loading. Errors
+  //     count as done; a 6s safety timeout releases the gate regardless.
+  //  2) WARM-UP — once the grid is visible, the remaining covers download in
+  //     the background (display order, a few at a time) so cards further down
+  //     are already cached by the time the visitor scrolls to them.
+  // FIRST LOAD ONLY: later live (onSnapshot) updates update the grid in place.
+  const coverUrls = useMemo(
+    () => filteredCreators.map((c) => c.coverImage).filter((u): u is string => !!u),
+    // Order only matters for the first load; recompute when the list changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredCreators.length, creators],
+  );
+  useEffect(() => {
+    if (imagesReady || creatorsLoading) return;
+    const firstScreen = coverUrls.slice(0, FIRST_SCREEN_COVERS);
+    if (firstScreen.length === 0) {
+      setImagesReady(true);
+      return;
+    }
+    let cancelled = false;
+    let loaded = 0;
+    firstScreen.forEach((u) =>
+      preloadImage(u).then(() => {
+        loaded += 1;
+        if (!cancelled && loaded >= firstScreen.length) setImagesReady(true);
+      }),
+    );
+    const safety = window.setTimeout(() => {
+      if (!cancelled) setImagesReady(true);
+    }, 6000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(safety);
+    };
+  }, [coverUrls, creatorsLoading, imagesReady]);
+
+  useEffect(() => {
+    if (!imagesReady) return;
+    const rest = [...new Set([
+      ...coverUrls.slice(FIRST_SCREEN_COVERS),
+      // Hidden by the current filter but likely next: every published cover.
+      ...creators.filter((c) => c.isPublished !== false).map((c) => c.coverImage),
+    ])].filter((u): u is string => !!u);
+    let cancelled = false;
+    let next = 0;
+    const worker = async () => {
+      while (!cancelled && next < rest.length) await preloadImage(rest[next++]);
+    };
+    for (let i = 0; i < BACKGROUND_PRELOAD_CONCURRENCY; i++) worker();
+    return () => {
+      cancelled = true;
+    };
+    // Run once, right after the grid first appears.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imagesReady]);
+
   // Source for the map's event-marker layer. Unlike `filteredCreators` (only
   // published shops), this includes shopless user docs that have published
   // events, so a published event pins on the map even without a shop. Same
@@ -735,26 +770,15 @@ export function Home() {
             </div>
           )}
           {(creatorsLoading || !imagesReady) ? (
-            // Loading state — gray bike pulsing to foreground colour. Renders
-            // INSTEAD of the grid/empty-state so the "No results found" copy
-            // never flashes during the initial Firestore fetch, AND held until
-            // every cover image is decoded so the grid pops in fully ready.
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex flex-col items-center justify-center py-32 gap-4"
-            >
-              <motion.div
-                animate={{ opacity: [0.25, 1, 0.25] }}
-                transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-                className={isDarkMode ? "text-white" : "text-black"}
-              >
-                <Bike className="w-16 h-16" />
-              </motion.div>
-              <div className={`text-xs font-bold uppercase tracking-widest ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-                {t("home.loading")}
-              </div>
-            </motion.div>
+            // Loading state — skeleton cards shaped like the real grid with the
+            // pulsing bike on top. Renders INSTEAD of the grid/empty-state so
+            // "No results found" never flashes during the initial fetch, and
+            // is held until the first screen of covers has loaded.
+            <CreatorGridSkeleton
+              isDarkMode={isDarkMode}
+              label={t("home.loading")}
+              variant={viewMode === "grid" ? "grid" : "map"}
+            />
           ) : (
             <>
               {viewMode === "grid" ? (
