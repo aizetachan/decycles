@@ -9,6 +9,7 @@ import { trackEvent } from "../../lib/analytics";
 import { EVENT_CATEGORY_COLORS } from "../../constants/categories";
 import { MAP_STYLE_DARK, MAP_STYLE_LIGHT } from "../../lib/mapStyles";
 import { VectorBasemap } from "./VectorBasemap";
+import { FitToResults, NearMeControl } from "./MapDiscovery";
 
 // Register two-finger / Ctrl+wheel gesture handling once at module load.
 // Behaviour: 1-finger touch scrolls the page; 2-finger pans/zooms the map.
@@ -23,6 +24,8 @@ interface CreatorMapProps {
   // published events, so their events still pin on the map. Falls back to
   // `filteredCreators` when not provided.
   eventCreators?: Creator[];
+  /** True when any filter/search is active — the map then frames the results. */
+  filtersActive?: boolean;
 }
 
 // Custom marker for events — small coloured dot with the category color. We
@@ -36,7 +39,7 @@ const eventIcon = (color: string) =>
     iconAnchor: [7, 7],
   });
 
-export function CreatorMap({ isDarkMode, filteredCreators, eventCreators }: CreatorMapProps) {
+export function CreatorMap({ isDarkMode, filteredCreators, eventCreators, filtersActive = false }: CreatorMapProps) {
   const { openCreatorProfile, openEvent } = useUI();
   // The map shows one layer at a time: creators (default) or events. Events
   // carry their own geocoded coordinates (set from the event's own address in
@@ -72,6 +75,16 @@ export function CreatorMap({ isDarkMode, filteredCreators, eventCreators }: Crea
     return list;
   }, [eventSource]);
 
+  // Coordinates of whatever layer is showing — drives "fit to results" and
+  // "near me".
+  const visiblePoints = useMemo<[number, number][]>(
+    () =>
+      showEvents
+        ? eventMarkers.map((m) => m.coords as [number, number])
+        : filteredCreators.filter((c) => c.coordinates).map((c) => c.coordinates as [number, number]),
+    [showEvents, eventMarkers, filteredCreators],
+  );
+
   return (
     <div className={`relative h-[600px] w-full brutalist-border brutalist-shadow ${isDarkMode ? "bg-black" : "bg-white"}`}>
       {/* Toggle — switches the map between creators and events. The label
@@ -99,6 +112,8 @@ export function CreatorMap({ isDarkMode, filteredCreators, eventCreators }: Crea
         {...({ gestureHandling: true } as any)}
       >
         <VectorBasemap style={isDarkMode ? MAP_STYLE_DARK : MAP_STYLE_LIGHT} />
+        <FitToResults points={visiblePoints} active={filtersActive} />
+        <NearMeControl points={visiblePoints} />
         {!showEvents && filteredCreators.map(creator => creator.coordinates && (
           <Marker key={creator.id} position={creator.coordinates}>
             <Popup className={isDarkMode ? "dark-popup" : ""}>

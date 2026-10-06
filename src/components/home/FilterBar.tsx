@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Search, Map, Grid, ChevronDown, Globe, X, SlidersHorizontal } from "lucide-react";
+import { Search, Map, Grid, ChevronDown, Globe, X, SlidersHorizontal, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Category, SubCategory } from "../../types";
 import { useCategories } from "../../contexts/CategoriesContext";
@@ -16,6 +16,8 @@ interface FilterBarProps {
   setViewMode: (mode: "grid" | "map") => void;
   searchQuery: string;
   setSearchQuery: (q: string) => void;
+  /** Cities with published creators, busiest first — powers search suggestions. */
+  cityIndex?: { city: string; country: string; count: number }[];
   selectedCountry: string;
   setIsCountryDropdownOpen: (open: boolean) => void;
   setIsMobileFiltersOpen: (open: boolean) => void;
@@ -45,6 +47,7 @@ export function FilterBar({
   isDarkMode,
   viewMode, setViewMode,
   searchQuery, setSearchQuery,
+  cityIndex = [],
   selectedCountry, setIsCountryDropdownOpen,
   setIsMobileFiltersOpen,
   activeCategory, handleCategoryChange,
@@ -58,6 +61,38 @@ export function FilterBar({
   currentSidebarCategory,
   setIsFiltersDrawerOpen,
 }: FilterBarProps) {
+  // City suggestions under the search box: type 2+ letters, pick a city and
+  // the search filters to it (in map view the map then flies there).
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [suggestIdx, setSuggestIdx] = useState(-1);
+  const citySuggestions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q.length < 2) return [];
+    return cityIndex
+      .filter((c) => c.city.toLowerCase() !== q && (c.city.toLowerCase().includes(q) || c.country.toLowerCase().startsWith(q)))
+      .slice(0, 6);
+  }, [searchQuery, cityIndex]);
+  const pickCity = (city: string) => {
+    setSearchQuery(city);
+    setSuggestOpen(false);
+    setSuggestIdx(-1);
+  };
+  const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!suggestOpen || citySuggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSuggestIdx((i) => (i + 1) % citySuggestions.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSuggestIdx((i) => (i <= 0 ? citySuggestions.length - 1 : i - 1));
+    } else if (e.key === "Enter" && suggestIdx >= 0) {
+      e.preventDefault();
+      pickCity(citySuggestions[suggestIdx].city);
+    } else if (e.key === "Escape") {
+      setSuggestOpen(false);
+    }
+  };
+
   const { t } = useT();
   // Live taxonomy from Firestore (admin can edit at /admin/categories).
   const { selectableCategories, getFlattenedSubcategories, subcategories } = useCategories();
@@ -329,7 +364,18 @@ export function FilterBar({
                 type="text"
                 placeholder={t("filter.search")}
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setSuggestOpen(true);
+                  setSuggestIdx(-1);
+                }}
+                onFocus={() => setSuggestOpen(true)}
+                onBlur={() => setSuggestOpen(false)}
+                onKeyDown={onSearchKeyDown}
+                role="combobox"
+                aria-expanded={suggestOpen && citySuggestions.length > 0}
+                aria-controls="city-suggestions"
+                aria-autocomplete="list"
                 className={`relative z-10 w-full pl-9 pr-8 py-2 focus:outline-none text-xs md:text-sm font-bold transition-all duration-300 uppercase tracking-wider brutalist-border brutalist-shadow ${
                   !isDarkMode
                     ? "bg-black text-white placeholder-gray-600 border-zinc-700"
@@ -349,6 +395,41 @@ export function FilterBar({
                   </motion.button>
                 )}
               </AnimatePresence>
+
+              {suggestOpen && citySuggestions.length > 0 && (
+                <ul
+                  id="city-suggestions"
+                  role="listbox"
+                  className={`absolute left-0 right-0 top-full mt-1 z-50 brutalist-border brutalist-shadow ${
+                    !isDarkMode ? "bg-black text-white border-zinc-700" : "bg-white text-black"
+                  }`}
+                >
+                  {citySuggestions.map((c, i) => (
+                    <li key={c.city} role="option" aria-selected={i === suggestIdx}>
+                      <button
+                        type="button"
+                        // mousedown (not click) so the input's blur doesn't close the list first
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          pickCity(c.city);
+                        }}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs font-bold uppercase tracking-wider transition-colors ${
+                          i === suggestIdx
+                            ? !isDarkMode ? "bg-white/10" : "bg-black/5"
+                            : !isDarkMode ? "hover:bg-white/10" : "hover:bg-black/5"
+                        }`}
+                      >
+                        <MapPin className="w-3.5 h-3.5 shrink-0 opacity-60" />
+                        <span className="truncate">{c.city}</span>
+                        {c.country && c.country !== "Worldwide" && (
+                          <span className="truncate opacity-50">· {c.country}</span>
+                        )}
+                        <span className="ml-auto pl-2 opacity-50 shrink-0">{c.count}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>
