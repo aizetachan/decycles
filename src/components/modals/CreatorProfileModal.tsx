@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Globe, MapPin, Maximize2, Heart, Share2, Check, Loader2 } from "lucide-react";
 import { doc, getDoc, setDoc, increment } from "firebase/firestore";
@@ -7,6 +7,7 @@ import { useUI } from "../../contexts/UIContext";
 import { useAuth } from "../../contexts/AuthContext";
 import { useT } from "../../contexts/LanguageContext";
 import { GalleryImageModal } from "./GalleryImageModal";
+import { SimilarCreators } from "./SimilarCreators";
 import { Creator } from "../../types";
 import { db } from "../../firebase";
 import { trackEvent } from "../../lib/analytics";
@@ -29,6 +30,9 @@ export function CreatorProfileModal() {
     openCreatorProfile,
   } = useUI();
   const { currentUser, userProfile: profileData, updateUserProfile } = useAuth();
+  // Scroll container of the modal (the overlay) — reset to top when a
+  // "similar creator" is opened in place.
+  const overlayRef = useRef<HTMLDivElement | null>(null);
   const { t } = useT();
 
   // Favourite toggle: stored on `users/{uid}.favorites` (array of creator ids).
@@ -208,6 +212,7 @@ export function CreatorProfileModal() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            ref={overlayRef}
             className="fixed inset-0 z-[100] flex items-start justify-center p-8 sm:p-12 lg:p-16 bg-black/70 backdrop-blur-sm overflow-y-auto"
             onClick={closeCreatorProfile}
           >
@@ -547,6 +552,18 @@ export function CreatorProfileModal() {
                       )}
                     </div>
                   </div>
+
+                  {selectedCreator.id !== "current-user" && (
+                    <SimilarCreators
+                      creator={selectedCreator}
+                      isDarkMode={isDarkMode}
+                      onOpen={(id) => {
+                        openCreatorProfile(id);
+                        // Same modal, new creator — start from the top.
+                        overlayRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+                      }}
+                    />
+                  )}
                 </>
               )}
             </motion.div>
