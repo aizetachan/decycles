@@ -225,3 +225,19 @@ body.dark .skeleton-shimmer::after {
     animation: none;
   }
 }
+
+/* Map "near me" control — same box as the zoom buttons, icon centred. */
+.leaflet-bar a.decycles-near-me {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #050505;
+}
+.leaflet-bar a.decycles-near-me.is-locating svg {
+  animation: decycles-locating 1s ease-in-out infinite;
+}
+@keyframes decycles-locating {
+  50% {
+    opacity: 0.3;
+  }
+}

@@ -256,10 +256,20 @@ export function Home() {
     return ["All", ...Array.from(uniqueCountries).sort()];
   }, [allCreators]);
 
-  // Extract unique cities from creators
-  const cities = useMemo(() => {
-    const uniqueCities = new Set(allCreators.map((c) => c.location).filter(Boolean));
-    return Array.from(uniqueCities).sort();
+  // City index for the search suggestions ("Barcelona · Spain · 12"): one
+  // entry per city with how many published creators it has, busiest first.
+  const cityIndex = useMemo(() => {
+    // globalThis.Map: `Map` is shadowed by the lucide icon import in this file.
+    const byCity = new globalThis.Map<string, { city: string; country: string; count: number }>();
+    allCreators.forEach((c) => {
+      const city = (c.location || "").trim();
+      if (!city) return;
+      const key = city.toLowerCase();
+      const entry = byCity.get(key) || { city, country: c.country || "", count: 0 };
+      entry.count += 1;
+      byCity.set(key, entry);
+    });
+    return [...byCity.values()].sort((a, b) => b.count - a.count || a.city.localeCompare(b.city));
   }, [allCreators]);
 
   const handleCategoryChange = (category: Category) => {
@@ -711,6 +721,7 @@ export function Home() {
             isDarkMode={isDarkMode}
             viewMode={viewMode} setViewMode={setViewMode}
             searchQuery={searchQuery} setSearchQuery={handleSearchQueryChange}
+            cityIndex={cityIndex}
             selectedCountry={selectedCountry} setIsCountryDropdownOpen={setIsCountryDropdownOpen}
             setIsMobileFiltersOpen={setIsMobileFiltersOpen}
             activeCategory={activeCategory} handleCategoryChange={handleCategoryChange}
@@ -795,6 +806,12 @@ export function Home() {
                     isDarkMode={isDarkMode}
                     filteredCreators={filteredCreators}
                     eventCreators={eventMapCreators}
+                    filtersActive={
+                      selectedCountry !== "All" ||
+                      searchQuery.trim() !== "" ||
+                      activeCategory !== "All" ||
+                      activeSubCategories.length > 0
+                    }
                   />
                 </Suspense>
               )}
