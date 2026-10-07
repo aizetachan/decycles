@@ -77,3 +77,23 @@ Producción ejecuta funciones del feed que solo existen en la rama
 `feed+notifications`. Desplegar funciones desde `main` (`npm run deploy`) las
 borraría. Hasta mergear o descartar la PR #30, desde `main` solo se despliega
 `hosting` (y `firestore:rules`, que ya incluyen las del feed).
+
+---
+
+## 5. Miniaturas de avatares (y portadas) para las tarjetas
+
+**Estado:** pendiente — depende del punto 4.
+
+Desde el 07-oct-2026 cada tarjeta del explorador muestra el avatar del
+creador a 32–40 px, pero se descarga la imagen completa (hasta 1600px WebP),
+igual que las portadas de las tarjetas (~330px de ancho). Con ~140 creadores
+son muchas descargas innecesarias, sobre todo en móvil.
+
+Solución propuesta: generar miniaturas al subir (p. ej. avatar 96px y portada
+~640px) con una Cloud Function o la extensión "Resize Images" de Firebase,
+guardar sus URLs junto a la original (`profileImageThumb`, `coverImageThumb`)
+y usarlas en tarjetas, sugerencias y mapa. Para lo ya subido, un script tipo
+`optimize-storage-images.cjs` que las genere.
+
+Bloqueo: requiere desplegar Cloud Functions (ver punto 4).
+
